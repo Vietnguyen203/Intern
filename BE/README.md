@@ -10,6 +10,7 @@ Thư mục này chứa toàn bộ các microservices của hệ thống RMS.
 - **table-service**: Quản lý trạng thái bàn (Port 8083).
 - **payment-service**: Quản lý thanh toán (Port 8085).
 - **notification-service**: Gửi thông báo WebSocket/Mail (Port 8086).
+- **loyalty-service**: Tài khoản khách hàng, tích điểm & hạng thành viên (Port 8088).
 - **migration-service**: Công cụ chạy script SQL (Liquibase).
 
 ## Cách chạy nhanh

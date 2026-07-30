@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: loyalty-service
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1522/XEPDB1
+    username: Food_Order
+    password: Ab@123456
+    driver-class-name: oracle.jdbc.OracleDriver
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: loyalty-service
+
+server:
+  port: 8088
+
+# JWT của KHÁCH HÀNG — secret RIÊNG, không dùng chung với nhân viên. Đổi giá trị này trước khi
+# đưa lên môi trường thật (đây chỉ là placeholder cho dev, giống cách các service khác đang làm).
+jwt:
+  customer:
+    secret: 7F3C9A21E6B84D0F1A2C5E8B90D4F6A37C1E5B8D2A9F4C6E0B3D7A1F5C8E2B94
+    expiration: 2592000000 # 30 ngày — khách dùng trên điện thoại riêng, nên để phiên dài hơn nhân viên
+  # JWT của NHÂN VIÊN — PHẢI khớp với jwt.secret bên users-service/order-service/payment-service
+  # thì mới xác thực được token thật do users-service phát hành cho waiter lúc checkout.
+  staff:
+    secret: 9B9A6B29C5B726C748C6B6F55DADC5F3C2C9BAF9489AECA17BDE99EBD69153C4
+
+# Tên topic Kafka mà payment-service phát ra khi thanh toán thành công — CHƯA XÁC NHẬN được giá trị
+# thật vì chưa đọc được source payment-service. Sửa lại đúng tên topic thật khi có source.
+loyalty:
+  kafka:
+    payment-topic: payment-completed
+
+# Actuator & Prometheus — theo đúng convention các service khác
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true

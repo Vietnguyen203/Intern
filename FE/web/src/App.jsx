@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeCanvas } from 'qrcode.react';
 import {
@@ -480,6 +480,332 @@ const LoginScreen = ({ onLoginSuccess }) => {
 };
 
 // ---------------------------------------------------------
+// Kitchen Display System (KDS) — ticket & board components
+// ---------------------------------------------------------
+// Giá trị mặc định — có thể chỉnh trong tab Settings (xem kdsSettings/KDS_SETTINGS_DEFAULT trong DashboardScreen).
+const KDS_SETTINGS_DEFAULT = { warningMinutes: 10, criticalMinutes: 15, autoStartMinutes: 0, autoReadyMinutes: 0, autoPrintOnCooking: false };
+
+// --- "Máy in bếp" mô phỏng: chưa có máy in nhiệt thật để test, nên thay vì gọi lệnh in,
+// mình vẽ phiếu ra <canvas> rồi tải về dưới dạng ảnh PNG — coi như "tờ giấy" máy in nhả ra.
+// Khi nào có máy in ESC/POS thật, chỉ cần thay hàm này bằng lệnh gửi lệnh in tương ứng.
+const wrapCanvasTextLines = (ctx, text, maxWidth) => {
+  const words = String(text).split(' ');
+  const lines = [];
+  let line = '';
+  words.forEach(word => {
+    const testLine = line ? `${line} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = testLine;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+};
+
+const printKitchenTicket = (item) => {
+  const width = 420; // mô phỏng khổ giấy in nhiệt ~80mm
+  const padding = 20;
+  const contentWidth = width - padding * 2;
+
+  // Canvas tạm chỉ để đo chữ (biết trước cần bao nhiêu dòng) trước khi dựng canvas thật với đúng chiều cao.
+  const measureCanvas = document.createElement('canvas');
+  const mctx = measureCanvas.getContext('2d');
+
+  mctx.font = 'bold 20px monospace';
+  const nameLines = wrapCanvasTextLines(mctx, `${item.quantity || 1}x ${item.foodName || 'Món'}`, contentWidth);
+
+  let noteLines = [];
+  if (item.note) {
+    mctx.font = 'italic 14px monospace';
+    noteLines = wrapCanvasTextLines(mctx, `Ghi chú: ${item.note}`, contentWidth);
+  }
+
+  const timeStr = new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  let height = padding + 32 + 26 + 16; // tiêu đề + dòng phụ đề + gạch ngang
+  height += 26; // dòng tên bàn
+  height += nameLines.length * 26 + 6;
+  if (noteLines.length) height += noteLines.length * 20 + 6;
+  height += 20; // "Vào bếp: ..."
+  if (item.orderId) height += 20; // "Mã đơn: ..."
+  height += 16 + padding; // gạch ngang cuối + padding dưới
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = Math.max(height, 220);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000'; ctx.textBaseline = 'top';
+
+  let y = padding;
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('PHIẾU BẾP', width / 2, y); y += 32;
+  ctx.font = '12px monospace';
+  ctx.fillText('— mô phỏng máy in, chưa nối máy in thật —', width / 2, y); y += 26;
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = '#000';
+  ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke(); y += 16;
+
+  ctx.font = 'bold 17px monospace';
+  ctx.fillText(item.tableNumber || 'Mang về', padding, y); y += 26;
+
+  ctx.font = 'bold 20px monospace';
+  nameLines.forEach(l => { ctx.fillText(l, padding, y); y += 26; });
+  y += 6;
+
+  if (noteLines.length) {
+    ctx.font = 'italic 14px monospace';
+    noteLines.forEach(l => { ctx.fillText(l, padding, y); y += 20; });
+    y += 6;
+  }
+
+  ctx.font = '13px monospace';
+  ctx.fillText(`Vào bếp: ${timeStr}`, padding, y); y += 20;
+  if (item.orderId) { ctx.fillText(`Mã đơn: #${item.orderId}`, padding, y); y += 20; }
+
+  y += 6;
+  ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  const safeTable = String(item.tableNumber || 'mang-ve').replace(/\s+/g, '-');
+  const safeFood = String(item.foodName || 'mon').replace(/\s+/g, '-');
+  link.download = `phieu-bep_${safeTable}_${safeFood}_${Date.now()}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const getKitchenWaitMinutes = (item, now) => {
+  if (!item.createdAt) return 0;
+  return Math.floor((now - new Date(item.createdAt).getTime()) / 60000);
+};
+
+// Urgency chỉ tính cho món còn đang chờ/đang nấu — món đã READY không cần "giục" bếp nữa.
+const getKitchenUrgency = (item, now, thresholds = KDS_SETTINGS_DEFAULT) => {
+  const isActive = item.kitchenStatus === 'PENDING' || item.kitchenStatus === 'COOKING';
+  if (!isActive) return 'normal';
+  const waited = getKitchenWaitMinutes(item, now);
+  if (waited >= thresholds.criticalMinutes) return 'critical';
+  if (waited >= thresholds.warningMinutes) return 'warning';
+  return 'normal';
+};
+
+// Đếm ngược tới mốc tự động chuyển trạng thái (nếu bếp có bật setting autoStartMinutes / autoReadyMinutes).
+// Chạy tick riêng 1 giây/lần CHỈ khi có đếm ngược cần hiển thị, để không kéo cả DashboardScreen re-render mỗi giây.
+const useAutoCountdown = (targetTime) => {
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (!targetTime) return;
+    const id = setInterval(() => forceTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [targetTime]);
+  if (!targetTime) return null;
+  return Math.max(0, Math.round((targetTime - Date.now()) / 1000));
+};
+
+const formatCountdown = (totalSeconds) => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const KitchenTicket = ({ item, now, kiosk, onStatusChange, onPrint, thresholds = KDS_SETTINGS_DEFAULT, cookStartMap }) => {
+  const ks = item.kitchenStatus;
+  const statusColor = ks === 'PENDING' ? '#F59E0B' : ks === 'COOKING' ? '#EF4444' : ks === 'READY' ? '#10B981' : '#6B7280';
+  const urgency = getKitchenUrgency(item, now, thresholds);
+  const waited = getKitchenWaitMinutes(item, now);
+  const borderColor = urgency === 'critical' ? '#DC2626' : urgency === 'warning' ? '#F59E0B' : `${statusColor}30`;
+
+  // Mốc thời gian sẽ tự động chuyển trạng thái, nếu setting tương ứng > 0
+  let autoTargetTime = null;
+  if (ks === 'PENDING' && thresholds.autoStartMinutes > 0 && item.createdAt) {
+    autoTargetTime = new Date(item.createdAt).getTime() + thresholds.autoStartMinutes * 60000;
+  } else if (ks === 'COOKING' && thresholds.autoReadyMinutes > 0) {
+    const cookStart = (cookStartMap && cookStartMap.get(item.id)) || (item.createdAt ? new Date(item.createdAt).getTime() : Date.now());
+    autoTargetTime = cookStart + thresholds.autoReadyMinutes * 60000;
+  }
+  const countdownSeconds = useAutoCountdown(autoTargetTime);
+  const btnStyle = (color) => ({
+    flex: 1,
+    padding: kiosk ? '18px' : '8px',
+    fontSize: kiosk ? '18px' : '12px',
+    minHeight: kiosk ? '56px' : 'auto',
+    fontWeight: '700',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    backgroundColor: color,
+    color: 'white',
+  });
+  const Dot = () => <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#CBD5E1' }} />;
+
+  return (
+    <div style={{
+      padding: kiosk ? '20px' : '12px',
+      borderRadius: '12px',
+      backgroundColor: urgency === 'critical' ? '#FEF2F2' : '#FFF',
+      border: `${urgency === 'normal' ? 1 : 3}px solid ${borderColor}`,
+      animation: urgency === 'critical' ? 'kdsPulse 1.2s ease-in-out infinite' : 'none',
+      position: 'relative',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: kiosk ? '14px' : '8px' }}>
+        <div style={{ flex: 1 }}>
+          <h5 style={{ fontSize: kiosk ? '24px' : '15px', fontWeight: '700', margin: 0, color: '#1E293B' }}>{item.foodName}</h5>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: kiosk ? '20px' : '13px', fontWeight: '800', color: '#64748B' }}>x{item.quantity}</span>
+            <Dot />
+            <span style={{ fontSize: kiosk ? '16px' : '11px', fontWeight: '700', color: statusColor, textTransform: 'uppercase' }}>
+              {ks === 'PENDING' ? '⏳ Chờ' : ks === 'COOKING' ? '🔥 Nấu' : ks === 'READY' ? '✅ Sẵn sàng' : ks}
+            </span>
+            {item.createdAt && (
+              <>
+                <Dot />
+                <span style={{ fontSize: kiosk ? '16px' : '11px', fontWeight: urgency !== 'normal' ? '800' : '600', color: urgency === 'critical' ? '#DC2626' : urgency === 'warning' ? '#B45309' : '#64748B' }}>
+                  ⏱️ {waited > 0 ? `${waited} phút` : 'Vừa xong'}{urgency === 'critical' ? ' — QUÁ LÂU!' : ''}
+                </span>
+              </>
+            )}
+            {item.stationName && (
+              <>
+                <Dot />
+                <span style={{ fontSize: kiosk ? '15px' : '11px', fontWeight: '600', color: '#6366F1' }}>{item.stationName}</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {item.note && (
+        <div style={{ fontSize: kiosk ? '15px' : '12px', fontStyle: 'italic', color: '#92400E', backgroundColor: '#FFFBEB', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', borderLeft: '3px solid #F59E0B' }}>
+          📝 {item.note}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {ks === 'PENDING' && (
+          <button onClick={() => onStatusChange(item.id, 'COOKING')} style={btnStyle('#EF4444')}>
+            {countdownSeconds !== null
+              ? (countdownSeconds > 0 ? `🔥 Tự nấu sau ${formatCountdown(countdownSeconds)}` : '🔥 Nấu ngay')
+              : '🔥 Nấu'}
+          </button>
+        )}
+        {ks === 'COOKING' && (
+          <button onClick={() => onStatusChange(item.id, 'READY')} style={btnStyle('#10B981')}>
+            {countdownSeconds !== null
+              ? (countdownSeconds > 0 ? `✅ Tự xong sau ${formatCountdown(countdownSeconds)}` : '✅ Xong ngay')
+              : '✅ Xong'}
+          </button>
+        )}
+        {ks === 'READY' && (
+          // Bếp chỉ nấu xong tới đây — waiter mới là người xác nhận đã trả món cho khách (bên tab Orders).
+          <div style={{ ...btnStyle('#EEF2FF'), color: '#6366F1', textAlign: 'center', cursor: 'default' }}>
+            🔔 Chờ phục vụ trả bàn
+          </div>
+        )}
+        {onPrint && (
+          <button onClick={() => onPrint(item)} title="In phiếu (mô phỏng — tải ảnh)"
+            style={{ padding: kiosk ? '18px' : '8px', minWidth: kiosk ? '56px' : '36px', minHeight: kiosk ? '56px' : 'auto', borderRadius: '8px', border: '1px solid #CBD5E1', cursor: 'pointer', backgroundColor: '#FFF', color: '#334155', fontSize: kiosk ? '18px' : '14px' }}>
+            🖨️
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const KitchenBoard = ({ items, viewMode, kiosk, now, onStatusChange, onCompleteAll, onPrint, thresholds = KDS_SETTINGS_DEFAULT, cookStartMap }) => {
+  if (items.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: kiosk ? '120px 40px' : '80px', color: 'var(--text-secondary)' }}>
+        <Utensils size={kiosk ? 72 : 52} style={{ margin: '0 auto 16px', opacity: 0.25 }} />
+        <p style={{ fontWeight: '600', fontSize: kiosk ? '22px' : '16px' }}>Không có món nào cần chế biến</p>
+        <p style={{ fontSize: kiosk ? '16px' : '13px', marginTop: '4px' }}>Tất cả đơn đã được phục vụ hoặc chưa có đơn mới.</p>
+      </div>
+    );
+  }
+
+  if (viewMode === 'status') {
+    const columns = [
+      { key: 'PENDING', label: '⏳ Chờ', color: '#F59E0B' },
+      { key: 'COOKING', label: '🔥 Đang nấu', color: '#EF4444' },
+      { key: 'READY', label: '✅ Sẵn sàng', color: '#10B981' },
+    ];
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: kiosk ? '20px' : '16px' }}>
+        {columns.map(col => {
+          const colItems = items.filter(i => i.kitchenStatus === col.key)
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          return (
+            <div key={col.key} style={{ backgroundColor: '#F8FAFC', borderRadius: '14px', padding: kiosk ? '16px' : '12px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '200px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
+                <h4 style={{ fontSize: kiosk ? '20px' : '15px', fontWeight: '800', color: col.color, margin: 0 }}>{col.label}</h4>
+                <span style={{ fontSize: kiosk ? '16px' : '12px', fontWeight: '700', color: '#64748B' }}>{colItems.length}</span>
+              </div>
+              {colItems.map(item => (
+                <KitchenTicket key={item.id} item={item} now={now} kiosk={kiosk} onStatusChange={onStatusChange} onPrint={onPrint} thresholds={thresholds} cookStartMap={cookStartMap} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // viewMode === 'table' (mặc định) — nhóm theo bàn, bàn nào gọi món sớm nhất lên đầu
+  const groups = Object.entries(
+    items.reduce((acc, item) => {
+      const key = item.tableNumber || 'Mang về';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {})
+  ).sort((a, b) => {
+    const timeA = Math.min(...a[1].map(i => new Date(i.createdAt).getTime()));
+    const timeB = Math.min(...b[1].map(i => new Date(i.createdAt).getTime()));
+    return timeA - timeB;
+  });
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${kiosk ? 420 : 350}px, 1fr))`, gap: kiosk ? '28px' : '24px' }}>
+      {groups.map(([tableName, tItems]) => (
+        <div key={tableName} className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: kiosk ? '20px 24px' : '16px 20px', backgroundColor: '#F8FAFC', borderBottom: '2px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: kiosk ? '44px' : '36px', height: kiosk ? '44px' : '36px', borderRadius: '10px', backgroundColor: '#11117F', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                <Users size={kiosk ? 22 : 18} />
+              </div>
+              <h4 style={{ fontSize: kiosk ? '24px' : '18px', fontWeight: '800', color: '#11117F', margin: 0 }}>{tableName}</h4>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: kiosk ? '14px' : '12px', fontWeight: '700', color: '#64748B', backgroundColor: '#F1F5F9', padding: '4px 10px', borderRadius: '20px' }}>
+                {tItems.length} món
+              </span>
+              {tItems.some(i => i.kitchenStatus === 'PENDING' || i.kitchenStatus === 'COOKING') && (
+                <button onClick={() => onCompleteAll(tItems)}
+                  style={{ padding: kiosk ? '10px 16px' : '6px 12px', fontSize: kiosk ? '15px' : '12px', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: '#10B981', color: 'white', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)' }}>
+                  <CheckCircle size={kiosk ? 18 : 14} /> Xong tất cả
+                </button>
+              )}
+            </div>
+          </div>
+          <div style={{ padding: kiosk ? '20px 24px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {[...tItems].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(item => (
+              <KitchenTicket key={item.id} item={item} now={now} kiosk={kiosk} onStatusChange={onStatusChange} onPrint={onPrint} thresholds={thresholds} cookStartMap={cookStartMap} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------
 // Dashboard Screen
 // ---------------------------------------------------------
 const DashboardScreen = ({ user, onLogout }) => {
@@ -699,6 +1025,23 @@ const DashboardScreen = ({ user, onLogout }) => {
 
   // 3) Sound Notification
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') !== 'false');
+
+  // KDS: ngưỡng cảnh báo món chậm + tự động chuyển trạng thái, để bếp đỡ phải chạm màn hình liên tục.
+  // Lưu trong localStorage — áp dụng riêng cho từng máy/màn hình đang mở app (chưa đồng bộ qua backend).
+  const [kdsSettings, setKdsSettings] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('kdsSettings') || 'null');
+      return saved ? { ...KDS_SETTINGS_DEFAULT, ...saved } : { ...KDS_SETTINGS_DEFAULT };
+    } catch { return { ...KDS_SETTINGS_DEFAULT }; }
+  });
+  const updateKdsSetting = (key, value) => {
+    setKdsSettings(prev => {
+      const next = { ...prev, [key]: Math.max(0, Number(value) || 0) };
+      localStorage.setItem('kdsSettings', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const playNotifSound = useCallback(() => {
     if (!soundEnabled) return;
     try {
@@ -972,7 +1315,11 @@ const DashboardScreen = ({ user, onLogout }) => {
     else if (activeTab === 'Tables') fetchTablesData();
     else if (activeTab === 'Menu & Food') fetchFoodsData();
     else if (activeTab === 'Staff') fetchStaffData();
-    else if (activeTab === 'Kitchen') fetchKitchenData();
+    else if (activeTab === 'Kitchen') {
+      fetchKitchenData();
+      // Cần foods + categories để nhóm món theo khu bếp trên KDS; tải nếu chưa có (vd. tài khoản Bếp đăng nhập vào thẳng tab này).
+      if (foods.length === 0) fetchFoodsData();
+    }
     else if (activeTab === 'Inventory') fetchInventoryData();
   }, [activeTab]);
 
@@ -1025,18 +1372,78 @@ const DashboardScreen = ({ user, onLogout }) => {
   };
 
   const [kitchenItems, setKitchenItems] = useState([]);
+
+  // --- KDS: chế độ xem, lọc theo khu bếp, chế độ Kiosk toàn màn hình ---
+  const [kitchenViewMode, setKitchenViewMode] = useState('table'); // 'table' | 'status'
+  const [kitchenCategoryFilter, setKitchenCategoryFilter] = useState('ALL');
+  const [kdsKioskMode, setKdsKioskMode] = useState(false);
+  const kdsWakeLockRef = useRef(null);
+
+  // Ghép món trong bếp với danh mục món ăn (khu bếp) dựa trên tên món.
+  // Ghi chú: OrderItemResponse hiện chỉ trả về foodName, chưa có categoryId/menuItemId,
+  // nên đây là cách ghép tạm qua tên món. Nếu backend bổ sung categoryId vào OrderItemResponse
+  // thì nên ghép trực tiếp bằng id để chính xác tuyệt đối (tránh trùng tên món ở danh mục khác).
+  const kitchenItemsWithCategory = useMemo(() => {
+    const foodCategoryMap = new Map();
+    (foods || []).forEach(f => {
+      const catName = (categories || []).find(c => c.id === f.categoryId)?.name;
+      if (catName) foodCategoryMap.set(f.foodName, catName);
+    });
+    return kitchenItems.map(item => ({ ...item, stationName: foodCategoryMap.get(item.foodName) || null }));
+  }, [kitchenItems, foods, categories]);
+
+  const kitchenCategoryOptions = useMemo(() => {
+    const set = new Set();
+    kitchenItemsWithCategory.forEach(i => { if (i.stationName) set.add(i.stationName); });
+    return ['ALL', ...Array.from(set).sort()];
+  }, [kitchenItemsWithCategory]);
+
+  useEffect(() => {
+    if (!kitchenCategoryOptions.includes(kitchenCategoryFilter)) setKitchenCategoryFilter('ALL');
+  }, [kitchenCategoryOptions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleKitchenItems = useMemo(() => {
+    if (kitchenCategoryFilter === 'ALL') return kitchenItemsWithCategory;
+    return kitchenItemsWithCategory.filter(i => i.stationName === kitchenCategoryFilter);
+  }, [kitchenItemsWithCategory, kitchenCategoryFilter]);
+
+  // Bật/tắt chế độ Kiosk: toàn màn hình + giữ màn hình tablet không tắt (Wake Lock).
+  const enterKitchenKiosk = async () => {
+    setKdsKioskMode(true);
+    try {
+      if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+    } catch (e) { console.warn('Không thể bật toàn màn hình:', e); }
+    try {
+      if ('wakeLock' in navigator) kdsWakeLockRef.current = await navigator.wakeLock.request('screen');
+    } catch (e) { console.warn('Không thể giữ màn hình sáng (Wake Lock):', e); }
+  };
+  const exitKitchenKiosk = () => {
+    setKdsKioskMode(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    if (kdsWakeLockRef.current) { kdsWakeLockRef.current.release().catch(() => {}); kdsWakeLockRef.current = null; }
+  };
+  useEffect(() => {
+    const handleFsChange = () => { if (!document.fullscreenElement) setKdsKioskMode(false); };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
   const fetchKitchenData = async () => {
     setLoadingConfig(prev => ({ ...prev, kitchen: true }));
     try {
-      // Lấy cả đơn PENDING và CONFIRMED, flatten items để bếp thấy từng món
-      const [pendingRes, confirmedRes] = await Promise.allSettled([
+      // Lấy đơn PENDING, CONFIRMED và ORDERING, flatten items để bếp thấy từng món.
+      // ORDERING = bàn đang ăn, vẫn có thể gọi thêm món — PHẢI lấy luôn, nếu không món gọi thêm
+      // ở bàn đang ORDERING vẫn tính tiền bình thường nhưng bếp sẽ không thấy để chế biến.
+      const [pendingRes, confirmedRes, orderingRes] = await Promise.allSettled([
         apiService.kitchen.getPendingOrders(),
         apiService.kitchen.getConfirmedOrders(),
+        apiService.kitchen.getOrderingOrders(),
       ]);
 
       const orders = [
         ...(pendingRes.status === 'fulfilled' ? (pendingRes.value.data || []) : []),
         ...(confirmedRes.status === 'fulfilled' ? (confirmedRes.value.data || []) : []),
+        ...(orderingRes.status === 'fulfilled' ? (orderingRes.value.data || []) : []),
       ];
 
       // Flatten: mỗi item giữ thông tin đơn (bàn, orderId, orderStatus)
@@ -1067,6 +1474,16 @@ const DashboardScreen = ({ user, onLogout }) => {
     } catch (error) { toast.error('Lỗi cập nhật: ' + error.message); }
   };
 
+  // Waiter xác nhận đã mang món ra bàn (READY -> SERVED) — thao tác này nằm ở tab Orders vì
+  // WAITER không có quyền vào tab Kitchen, và về nghiệp vụ đây đúng là việc của phục vụ chứ không phải bếp.
+  const handleServeItem = async (itemId, foodName) => {
+    try {
+      await apiService.kitchen.updateItemStatus(itemId, 'SERVED');
+      toast.success(`🛎️ Đã trả món: ${foodName}`);
+      fetchOrdersData();
+    } catch (error) { toast.error('Lỗi cập nhật: ' + error.message); }
+  };
+
   const handleCompleteAllItems = async (items) => {
     try {
       const pendingAndCooking = items.filter(i => i.kitchenStatus === 'PENDING' || i.kitchenStatus === 'COOKING');
@@ -1078,6 +1495,59 @@ const DashboardScreen = ({ user, onLogout }) => {
       fetchKitchenData();
     } catch (error) { toast.error('Lỗi cập nhật: ' + error.message); }
   };
+
+  // --- KDS: tự động chuyển trạng thái món theo thời gian (nếu bật trong Settings) ---
+  // Mục tiêu: giảm số lần bếp phải chạm màn hình liên tục trong lúc tay đang bận nấu.
+  const kdsCookStartRef = useRef(new Map()); // itemId -> mốc thời gian (ước lượng phía client) khi món bắt đầu COOKING
+  const kdsAutoTransitionInFlightRef = useRef(new Set());
+
+  useEffect(() => {
+    // Chỉ dùng để ước lượng thời điểm bắt đầu nấu cho logic tự-động-Sẵn-sàng bên dưới —
+    // KHÔNG dùng cho đồng hồ hiển thị trên vé (đồng hồ hiển thị vẫn tính theo giờ tạo đơn, đúng nghĩa "khách đã chờ bao lâu").
+    const next = new Map();
+    kitchenItems.forEach(item => {
+      if (item.kitchenStatus === 'COOKING') {
+        next.set(item.id, kdsCookStartRef.current.get(item.id) || Date.now());
+      }
+    });
+    kdsCookStartRef.current = next;
+  }, [kitchenItems]);
+
+  useEffect(() => {
+    if (kdsSettings.autoStartMinutes <= 0 && kdsSettings.autoReadyMinutes <= 0) return;
+    kitchenItems.forEach(item => {
+      if (kdsAutoTransitionInFlightRef.current.has(item.id)) return;
+
+      if (kdsSettings.autoStartMinutes > 0 && item.kitchenStatus === 'PENDING' && item.createdAt) {
+        const waitedMs = timeTicker - new Date(item.createdAt).getTime();
+        if (waitedMs >= kdsSettings.autoStartMinutes * 60000) {
+          kdsAutoTransitionInFlightRef.current.add(item.id);
+          apiService.kitchen.updateItemStatus(item.id, 'COOKING')
+            .then(() => {
+              toast.info(`⏱️ Tự động bắt đầu nấu: ${item.foodName}`);
+              // In phiếu ngay lúc này để bếp không bị "quên" món tự động chuyển mà không ai bấm tay.
+              if (kdsSettings.autoPrintOnCooking) printKitchenTicket(item);
+              fetchKitchenData();
+            })
+            .catch(() => {})
+            .finally(() => kdsAutoTransitionInFlightRef.current.delete(item.id));
+          return;
+        }
+      }
+
+      if (kdsSettings.autoReadyMinutes > 0 && item.kitchenStatus === 'COOKING') {
+        const cookStart = kdsCookStartRef.current.get(item.id) || (item.createdAt ? new Date(item.createdAt).getTime() : timeTicker);
+        if (timeTicker - cookStart >= kdsSettings.autoReadyMinutes * 60000) {
+          kdsAutoTransitionInFlightRef.current.add(item.id);
+          apiService.kitchen.updateItemStatus(item.id, 'READY')
+            .then(() => { toast.info(`✅ Tự động chuyển Sẵn sàng: ${item.foodName}`); fetchKitchenData(); })
+            .catch(() => {})
+            .finally(() => kdsAutoTransitionInFlightRef.current.delete(item.id));
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeTicker, kdsSettings.autoStartMinutes, kdsSettings.autoReadyMinutes]);
 
   const fetchOverviewData = async () => {
     setLoadingConfig(prev => ({ ...prev, overview: true }));
@@ -1284,10 +1754,12 @@ const DashboardScreen = ({ user, onLogout }) => {
     try {
       const selectedTable = tables.find(t => String(t.id) === String(selectedTableId));
 
-      // Kiểm tra xem bàn này đã có đơn hàng nào đang hoạt động chưa (PENDING/CONFIRMED)
+      // Kiểm tra xem bàn này đã có đơn hàng nào đang hoạt động chưa (PENDING/CONFIRMED/ORDERING).
+      // Trước đây thiếu ORDERING nên bàn đang ăn (ORDERING) gọi thêm món sẽ bị tạo NHẦM thành đơn mới
+      // thay vì cộng vào đơn cũ — khiến bếp không thấy món mới dù tiền vẫn được tính đúng.
       const existingOrder = allOrders.find(o =>
         String(o.tableId) === String(selectedTableId) &&
-        (o.status === 'PENDING' || o.status === 'CONFIRMED')
+        (o.status === 'PENDING' || o.status === 'CONFIRMED' || o.status === 'ORDERING')
       );
 
       if (existingOrder) {
@@ -2348,7 +2820,13 @@ const DashboardScreen = ({ user, onLogout }) => {
           {/* KITCHEN TAB */}
           {activeTab === 'Kitchen' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <style>{`
+                @keyframes kdsPulse {
+                  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35); }
+                  50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+                }
+              `}</style>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: '700', margin: 0 }}>🍳 Bếp — Đơn cần chế biến</h3>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
@@ -2357,128 +2835,125 @@ const DashboardScreen = ({ user, onLogout }) => {
                     {kitchenItems.filter(i => i.kitchenStatus === 'READY').length} sẵn sàng
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid #E2E8F0' }}>
+                    <button onClick={() => setKitchenViewMode('table')}
+                      style={{ padding: '8px 14px', fontSize: '13px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: kitchenViewMode === 'table' ? '#11117F' : '#FFF', color: kitchenViewMode === 'table' ? '#FFF' : '#334155' }}>
+                      🗂️ Theo bàn
+                    </button>
+                    <button onClick={() => setKitchenViewMode('status')}
+                      style={{ padding: '8px 14px', fontSize: '13px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: kitchenViewMode === 'status' ? '#11117F' : '#FFF', color: kitchenViewMode === 'status' ? '#FFF' : '#334155' }}>
+                      📊 Theo trạng thái
+                    </button>
+                  </div>
                   {user?.role === 'KITCHEN' && (
                     <button onClick={handleOpenProposeFoodModal} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '14px' }}>💡 Đề xuất món mới</button>
                   )}
+                  <button onClick={enterKitchenKiosk} className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '14px' }}>🖥️ Chế độ Kiosk</button>
                   <button onClick={fetchKitchenData} className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '14px' }}>🔄 Làm mới</button>
                 </div>
               </div>
 
-              {loadingConfig.kitchen ? (
-                <p style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Đang tải dữ liệu bếp...</p>
-              ) : kitchenItems.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-secondary)' }}>
-                  <Utensils size={52} style={{ margin: '0 auto 16px', opacity: 0.25 }} />
-                  <p style={{ fontWeight: '600', fontSize: '16px' }}>Không có món nào cần chế biến</p>
-                  <p style={{ fontSize: '13px', marginTop: '4px' }}>Tất cả đơn đã được phục vụ hoặc chưa có đơn mới.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
-                  {Object.entries(
-                    kitchenItems.reduce((acc, item) => {
-                      const key = item.tableNumber || 'Mang về';
-                      if (!acc[key]) acc[key] = [];
-                      acc[key].push(item);
-                      return acc;
-                    }, {})
-                  )
-                    .sort((a, b) => {
-                      // Sắp xếp các bàn: bàn nào có món gọi sớm nhất (createdAt nhỏ nhất) sẽ lên đầu
-                      const timeA = Math.min(...a[1].map(i => new Date(i.createdAt).getTime()));
-                      const timeB = Math.min(...b[1].map(i => new Date(i.createdAt).getTime()));
-                      return timeA - timeB;
-                    })
-                    .map(([tableName, items]) => (
-                      <div key={tableName} className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
-                        {/* Table Header */}
-                        <div style={{ padding: '16px 20px', backgroundColor: '#F8FAFC', borderBottom: '2px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#11117F', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                              <Users size={18} />
-                            </div>
-                            <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#11117F', margin: 0 }}>{tableName}</h4>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748B', backgroundColor: '#F1F5F9', padding: '4px 10px', borderRadius: '20px' }}>
-                              {items.length} món
-                            </span>
-                            {items.some(i => i.kitchenStatus === 'PENDING' || i.kitchenStatus === 'COOKING') && (
-                              <button onClick={() => handleCompleteAllItems(items)}
-                                style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: '#10B981', color: 'white', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)' }}>
-                                <CheckCircle size={14} /> Xong tất cả
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Items List */}
-                        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {[...items].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map((item, idx) => {
-                            const ks = item.kitchenStatus;
-                            const statusColor = ks === 'PENDING' ? '#F59E0B' : ks === 'COOKING' ? '#EF4444' : ks === 'READY' ? '#10B981' : '#6B7280';
-
-                            return (
-                              <div key={item.id} style={{ padding: '12px', borderRadius: '12px', backgroundColor: '#FFF', border: `1px solid ${statusColor}30`, position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                  <div style={{ flex: 1 }}>
-                                    <h5 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#1E293B' }}>{item.foodName}</h5>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                                      <span style={{ fontSize: '13px', fontWeight: '800', color: '#64748B' }}>x{item.quantity}</span>
-                                      <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#CBD5E1' }} />
-                                      <span style={{ fontSize: '11px', fontWeight: '700', color: statusColor, textTransform: 'uppercase' }}>
-                                        {ks === 'PENDING' ? '⏳ Chờ' : ks === 'COOKING' ? '🔥 Nấu' : ks === 'READY' ? '✅ Sẵn sàng' : ks}
-                                      </span>
-                                      {item.createdAt && (
-                                        <>
-                                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#CBD5E1' }} />
-                                          <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B' }}>
-                                            ⏱️ {(() => {
-                                              const waited = Math.floor((timeTicker - new Date(item.createdAt).getTime()) / 60000);
-                                              return waited > 0 ? `${waited} phút` : 'Vừa xong';
-                                            })()}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {item.note && (
-                                  <div style={{ fontSize: '12px', fontStyle: 'italic', color: '#92400E', backgroundColor: '#FFFBEB', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', borderLeft: '3px solid #F59E0B' }}>
-                                    📝 {item.note}
-                                  </div>
-                                )}
-
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                  {ks === 'PENDING' && (
-                                    <button onClick={() => handleUpdateItemStatus(item.id, 'COOKING')}
-                                      style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: '#EF4444', color: 'white' }}>
-                                      🔥 Nấu
-                                    </button>
-                                  )}
-                                  {ks === 'COOKING' && (
-                                    <button onClick={() => handleUpdateItemStatus(item.id, 'READY')}
-                                      style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: '#10B981', color: 'white' }}>
-                                      ✅ Xong
-                                    </button>
-                                  )}
-                                  {ks === 'READY' && (
-                                    <button onClick={() => handleUpdateItemStatus(item.id, 'SERVED')}
-                                      style={{ flex: 1, padding: '8px', fontSize: '12px', fontWeight: '700', borderRadius: '8px', border: 'none', cursor: 'pointer', backgroundColor: '#6366F1', color: 'white' }}>
-                                      🛎️ Trả món
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
+              {kitchenCategoryOptions.length > 1 && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  {kitchenCategoryOptions.map(cat => (
+                    <button key={cat} onClick={() => setKitchenCategoryFilter(cat)}
+                      style={{
+                        padding: '6px 14px', fontSize: '12px', fontWeight: '700', borderRadius: '20px',
+                        border: `1px solid ${kitchenCategoryFilter === cat ? '#11117F' : '#E2E8F0'}`,
+                        backgroundColor: kitchenCategoryFilter === cat ? '#11117F' : '#FFF',
+                        color: kitchenCategoryFilter === cat ? '#FFF' : '#334155', cursor: 'pointer',
+                      }}>
+                      {cat === 'ALL' ? 'Tất cả khu' : cat}
+                    </button>
+                  ))}
                 </div>
               )}
+
+              {loadingConfig.kitchen ? (
+                <p style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Đang tải dữ liệu bếp...</p>
+              ) : (
+                <KitchenBoard
+                  items={visibleKitchenItems}
+                  viewMode={kitchenViewMode}
+                  kiosk={false}
+                  now={timeTicker}
+                  onStatusChange={handleUpdateItemStatus}
+                  onCompleteAll={handleCompleteAllItems}
+                  onPrint={printKitchenTicket}
+                  thresholds={kdsSettings}
+                  cookStartMap={kdsCookStartRef.current}
+                />
+              )}
             </motion.div>
+          )}
+
+          {/* KDS KIOSK — màn hình toàn màn hình dành cho tablet/màn hình gắn trong bếp */}
+          {kdsKioskMode && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: '#F1F5F9', overflowY: 'auto', padding: '28px' }}>
+              <style>{`
+                @keyframes kdsPulse {
+                  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35); }
+                  50% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+                }
+              `}</style>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h2 style={{ fontSize: '32px', fontWeight: '800', margin: 0 }}>🍳 MÀN HÌNH BẾP</h2>
+                  <p style={{ fontSize: '18px', color: '#64748B', marginTop: '4px' }}>
+                    {kitchenItems.filter(i => i.kitchenStatus === 'PENDING').length} chờ &middot;{' '}
+                    {kitchenItems.filter(i => i.kitchenStatus === 'COOKING').length} đang nấu &middot;{' '}
+                    {kitchenItems.filter(i => i.kitchenStatus === 'READY').length} sẵn sàng
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '2px solid #CBD5E1' }}>
+                    <button onClick={() => setKitchenViewMode('table')}
+                      style={{ padding: '12px 20px', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: kitchenViewMode === 'table' ? '#11117F' : '#FFF', color: kitchenViewMode === 'table' ? '#FFF' : '#334155' }}>
+                      🗂️ Theo bàn
+                    </button>
+                    <button onClick={() => setKitchenViewMode('status')}
+                      style={{ padding: '12px 20px', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: kitchenViewMode === 'status' ? '#11117F' : '#FFF', color: kitchenViewMode === 'status' ? '#FFF' : '#334155' }}>
+                      📊 Theo trạng thái
+                    </button>
+                  </div>
+                  <button onClick={fetchKitchenData} style={{ padding: '12px 20px', fontSize: '16px', fontWeight: '700', borderRadius: '10px', border: '2px solid #CBD5E1', cursor: 'pointer', backgroundColor: '#FFF', color: '#334155' }}>
+                    🔄 Làm mới
+                  </button>
+                  <button onClick={exitKitchenKiosk} style={{ padding: '12px 20px', fontSize: '16px', fontWeight: '700', borderRadius: '10px', border: 'none', cursor: 'pointer', backgroundColor: '#EF4444', color: '#FFF' }}>
+                    ✕ Thoát Kiosk
+                  </button>
+                </div>
+              </div>
+
+              {kitchenCategoryOptions.length > 1 && (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                  {kitchenCategoryOptions.map(cat => (
+                    <button key={cat} onClick={() => setKitchenCategoryFilter(cat)}
+                      style={{
+                        padding: '10px 18px', fontSize: '15px', fontWeight: '700', borderRadius: '20px',
+                        border: `2px solid ${kitchenCategoryFilter === cat ? '#11117F' : '#CBD5E1'}`,
+                        backgroundColor: kitchenCategoryFilter === cat ? '#11117F' : '#FFF',
+                        color: kitchenCategoryFilter === cat ? '#FFF' : '#334155', cursor: 'pointer',
+                      }}>
+                      {cat === 'ALL' ? 'Tất cả khu' : cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <KitchenBoard
+                items={visibleKitchenItems}
+                viewMode={kitchenViewMode}
+                kiosk={true}
+                now={timeTicker}
+                onStatusChange={handleUpdateItemStatus}
+                onCompleteAll={handleCompleteAllItems}
+                onPrint={printKitchenTicket}
+                thresholds={kdsSettings}
+                cookStartMap={kdsCookStartRef.current}
+              />
+            </div>
           )}
 
           {/* ORDERS TAB - New Real-time Table Grid View */}
@@ -2623,7 +3098,8 @@ const DashboardScreen = ({ user, onLogout }) => {
                                 {(order.items || []).map((item, idx) => {
                                   const canDelete = !item.kitchenStatus || item.kitchenStatus === 'PENDING';
                                   return (
-                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', gap: '8px' }}>
+                                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', gap: '8px' }}>
                                       <span style={{ color: '#475569', flex: 1 }}><strong style={{ color: '#0F172A' }}>{item.quantity}x</strong> {item.foodName}
                                         {item.kitchenStatus && item.kitchenStatus !== 'PENDING' && (
                                           <span style={{ marginLeft: '6px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '8px',
@@ -2648,6 +3124,22 @@ const DashboardScreen = ({ user, onLogout }) => {
                                       >
                                         <Trash2 size={13} />
                                       </button>
+                                    </div>
+                                    {item.kitchenStatus === 'READY' && (
+                                      <button
+                                        onClick={() => handleServeItem(item.id, item.foodName)}
+                                        title="Xác nhận đã mang món ra bàn cho khách"
+                                        style={{
+                                          background: '#10B981', border: 'none', borderRadius: '10px',
+                                          padding: '14px', fontSize: '15px', fontWeight: '800',
+                                          color: '#FFF', cursor: 'pointer', width: '100%',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                          boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+                                        }}
+                                      >
+                                        🛎️ Trả món
+                                      </button>
+                                    )}
                                     </div>
                                   );
                                 })}
@@ -3492,7 +3984,78 @@ const DashboardScreen = ({ user, onLogout }) => {
                 </div>
               </div>
 
+              {/* KDS Settings Section — ADMIN & KITCHEN */}
+              {(user?.role === 'ADMIN' || user?.role === 'KITCHEN') && (
+              <div className="card" style={{ padding: '24px' }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: 'var(--primary)' }}>🍳 Cấu hình Bếp (KDS)</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Áp dụng cho màn hình bếp trên thiết bị này. Chỉnh theo tốc độ nấu thực tế của quán.
+                  </p>
+                </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                  <div className="input-group">
+                    <label>⚠️ Cảnh báo món chậm sau (phút)</label>
+                    <input type="number" min="1" className="input-field"
+                      value={kdsSettings.warningMinutes}
+                      onChange={e => updateKdsSetting('warningMinutes', e.target.value)} />
+                  </div>
+                  <div className="input-group">
+                    <label>🔴 Báo động đỏ sau (phút)</label>
+                    <input type="number" min="1" className="input-field"
+                      value={kdsSettings.criticalMinutes}
+                      onChange={e => updateKdsSetting('criticalMinutes', e.target.value)} />
+                  </div>
+                </div>
+
+                <div style={{ paddingTop: '16px', borderTop: '1px dashed var(--border-color)' }}>
+                  <p style={{ fontSize: '14px', fontWeight: '700', margin: '0 0 4px' }}>Tự động chuyển trạng thái (đỡ phải chạm màn hình)</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+                    Để 0 = tắt (giữ nguyên thao tác tay như hiện tại). Bật lên nếu bếp bận tay liên tục và muốn hệ thống tự chạy vé.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                    <div className="input-group">
+                      <label>Tự chuyển "Chờ" → "Đang nấu" sau (phút, 0 = tắt)</label>
+                      <input type="number" min="0" className="input-field"
+                        value={kdsSettings.autoStartMinutes}
+                        onChange={e => updateKdsSetting('autoStartMinutes', e.target.value)} />
+                    </div>
+                    <div className="input-group">
+                      <label>Tự chuyển "Đang nấu" → "Sẵn sàng" sau (phút, 0 = tắt)</label>
+                      <input type="number" min="0" className="input-field"
+                        value={kdsSettings.autoReadyMinutes}
+                        onChange={e => updateKdsSetting('autoReadyMinutes', e.target.value)} />
+                    </div>
+                  </div>
+                  {kdsSettings.autoReadyMinutes > 0 && (
+                    <p style={{ fontSize: '12px', color: '#B45309', backgroundColor: '#FFFBEB', padding: '10px 12px', borderRadius: '8px', marginTop: '12px', borderLeft: '3px solid #F59E0B' }}>
+                      ⚠️ Hệ thống sẽ tự đánh dấu món "Sẵn sàng" mà không cần bếp xác nhận tay. Chỉ nên bật nếu bạn tự tin về thời gian nấu trung bình của quán — nếu không, nhân viên phục vụ có thể mang món chưa thật sự xong ra bàn.
+                    </p>
+                  )}
+                </div>
+
+                <div style={{ paddingTop: '16px', marginTop: '16px', borderTop: '1px dashed var(--border-color)' }}>
+                  <div
+                    onClick={() => updateKdsSetting('autoPrintOnCooking', kdsSettings.autoPrintOnCooking ? 0 : 1)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderRadius: '14px', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: kdsSettings.autoPrintOnCooking ? 'rgba(99,102,241,0.15)' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>🖨️</div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)' }}>Tự in phiếu khi tự động chuyển "Đang nấu"</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          {kdsSettings.autoPrintOnCooking ? 'Đang bật — chỉ áp dụng khi "Tự chuyển Chờ → Đang nấu" ở trên > 0' : 'Đang tắt'}. Chưa có máy in thật nên sẽ tải về 1 ảnh mô phỏng tờ phiếu.
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ width: '52px', height: '28px', borderRadius: '14px', backgroundColor: kdsSettings.autoPrintOnCooking ? '#6366F1' : '#CBD5E1', position: 'relative', transition: 'background 0.3s', flexShrink: 0 }}>
+                      <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#FFF', position: 'absolute', top: '3px', left: kdsSettings.autoPrintOnCooking ? '27px' : '3px', transition: 'left 0.25s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              )} {/* end KDS Settings */}
 
               {isTableModalOpen && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -5545,7 +6108,7 @@ const App = () => {
 
 const QRCodeModal = ({ table, onClose }) => {
   const [hostIp, setHostIp] = useState(() => {
-    return window.location.hostname === 'localhost' ? '192.168.31.53:5173' : window.location.host;
+    return window.location.hostname === 'localhost' ? '192.168.1.4:5173' : window.location.host;
   });
 
   if (!table) return null;

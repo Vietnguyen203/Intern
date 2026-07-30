@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="202607281006-seed-default-membership-tiers" author="Vietnguyen203" labels="202607281006">
+        <insert tableName="membership_tiers">
+            <column name="id" value="a1000000-0000-0000-0000-000000000001"/>
+            <column name="tier_rank" value="BRONZE"/>
+            <column name="name" value="Bronze Member"/>
+            <column name="min_total_spent" valueNumeric="0"/>
+            <column name="discount_percent" valueNumeric="0"/>
+            <column name="point_multiplier" valueNumeric="1.0"/>
+            <column name="color" value="#B08D57"/>
+            <column name="sort_order" valueNumeric="1"/>
+        </insert>
+        <insert tableName="membership_tiers">
+            <column name="id" value="a1000000-0000-0000-0000-000000000002"/>
+            <column name="tier_rank" value="SILVER"/>
+            <column name="name" value="Silver Member"/>
+            <column name="min_total_spent" valueNumeric="3000000"/>
+            <column name="discount_percent" valueNumeric="3"/>
+            <column name="point_multiplier" valueNumeric="1.2"/>
+            <column name="color" value="#C0C0C0"/>
+            <column name="sort_order" valueNumeric="2"/>
+        </insert>
+        <insert tableName="membership_tiers">
+            <column name="id" value="a1000000-0000-0000-0000-000000000003"/>
+            <column name="tier_rank" value="GOLD"/>
+            <column name="name" value="Gold Member"/>
+            <column name="min_total_spent" valueNumeric="10000000"/>
+            <column name="discount_percent" valueNumeric="5"/>
+            <column name="point_multiplier" valueNumeric="1.5"/>
+            <column name="color" value="#FFD700"/>
+            <column name="sort_order" valueNumeric="3"/>
+        </insert>
+        <insert tableName="membership_tiers">
+            <column name="id" value="a1000000-0000-0000-0000-000000000004"/>
+            <column name="tier_rank" value="DIAMOND"/>
+            <column name="name" value="Diamond Member"/>
+            <column name="min_total_spent" valueNumeric="30000000"/>
+            <column name="discount_percent" valueNumeric="10"/>
+            <column name="point_multiplier" valueNumeric="2.0"/>
+            <column name="color" value="#6EE7F5"/>
+            <column name="sort_order" valueNumeric="4"/>
+        </insert>
+        <rollback>
+            <delete tableName="membership_tiers">
+                <where>tier_rank IN ('BRONZE','SILVER','GOLD','DIAMOND')</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

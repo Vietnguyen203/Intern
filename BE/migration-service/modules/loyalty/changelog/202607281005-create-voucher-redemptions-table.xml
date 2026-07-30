@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="202607281005-create-voucher-redemptions-table" author="Vietnguyen203" labels="202607281005">
+        <createTable tableName="voucher_redemptions">
+            <column name="id" type="VARCHAR2(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="VARCHAR2(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reward_item_id" type="VARCHAR2(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_voucher_code"/>
+            </column>
+            <!-- status: 0 = ISSUED, 1 = USED, 2 = EXPIRED -->
+            <column name="status" type="SMALLINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="issued_at" type="TIMESTAMP"/>
+            <column name="used_at" type="TIMESTAMP"/>
+            <!-- used_on_order_id trỏ sang orders bên order-service — không addForeignKeyConstraint,
+                 cùng lý do với point_transactions.order_id. -->
+            <column name="used_on_order_id" type="VARCHAR2(36)"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="voucher_redemptions" baseColumnNames="customer_id"
+                                  constraintName="fk_voucher_customer"
+                                  referencedTableName="customers" referencedColumnNames="id"/>
+        <addForeignKeyConstraint baseTableName="voucher_redemptions" baseColumnNames="reward_item_id"
+                                  constraintName="fk_voucher_reward_item"
+                                  referencedTableName="reward_items" referencedColumnNames="id"/>
+        <createIndex indexName="idx_voucher_customer" tableName="voucher_redemptions">
+            <column name="customer_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="voucher_redemptions"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

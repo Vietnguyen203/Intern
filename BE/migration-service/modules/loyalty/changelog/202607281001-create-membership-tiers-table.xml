@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="202607281001-create-membership-tiers-table" author="Vietnguyen203" labels="202607281001">
+        <createTable tableName="membership_tiers">
+            <column name="id" type="VARCHAR2(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- Đặt tên "tier_rank" thay vì "code" để tránh nhầm với các cột "code" khác (vd voucher code) -->
+            <column name="tier_rank" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_tiers_rank"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="min_total_spent" type="NUMBER(15,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discount_percent" type="DECIMAL(5,2)" defaultValueNumeric="0"/>
+            <column name="point_multiplier" type="DECIMAL(5,2)" defaultValueNumeric="1"/>
+            <column name="color" type="VARCHAR(20)"/>
+            <column name="sort_order" type="INT" defaultValueNumeric="0"/>
+            <column name="created_at" type="TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP"/>
+        </createTable>
+        <rollback>
+            <dropTable tableName="membership_tiers"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

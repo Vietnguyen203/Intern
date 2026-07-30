@@ -76,6 +76,14 @@ spring:
           filters:
             - RewritePath=/api/notifications/(?<segment>.*), /notifications/$\{segment}
 
+        # 8. Loyalty Service (8088) — tài khoản khách hàng + tích điểm/hạng thành viên
+        - id: loyalty_route
+          uri: http://localhost:8088
+          predicates:
+            - Path=/loyalty/**
+          filters:
+            - RewritePath=/loyalty/(?<segment>.*), /$\{segment}
+
 logging:
   level:
     org.springframework.cloud.gateway: TRACE

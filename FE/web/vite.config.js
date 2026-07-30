@@ -28,6 +28,11 @@ export default defineConfig({
         changeOrigin: true,
         headers: { 'Origin': 'http://localhost:5173' }
       },
+      '/loyalty': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        headers: { 'Origin': 'http://localhost:5173' }
+      },
       '/ws-notifications': {
         target: 'http://localhost:8080',
         ws: true,

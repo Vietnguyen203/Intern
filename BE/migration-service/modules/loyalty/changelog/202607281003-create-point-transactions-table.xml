@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="202607281003-create-point-transactions-table" author="Vietnguyen203" labels="202607281003">
+        <createTable tableName="point_transactions">
+            <column name="id" type="VARCHAR2(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="VARCHAR2(36)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- order_id trỏ sang bảng orders bên order-service — KHÔNG addForeignKeyConstraint
+                 vì đây là 2 service/DB schema khác domain, chỉ liên kết lỏng qua UUID (giống cách
+                 order_items.menu_item_id đang trỏ sang catalog-service trong dự án hiện tại). -->
+            <column name="order_id" type="VARCHAR2(36)"/>
+            <!-- type: 0 = EARN, 1 = REDEEM, 2 = EXPIRE, 3 = ADJUST -->
+            <column name="type" type="SMALLINT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- points: dương với EARN/ADJUST(+), âm với REDEEM/EXPIRE -->
+            <column name="points" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="note" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="point_transactions" baseColumnNames="customer_id"
+                                  constraintName="fk_point_tx_customer"
+                                  referencedTableName="customers" referencedColumnNames="id"/>
+        <createIndex indexName="idx_point_tx_customer" tableName="point_transactions">
+            <column name="customer_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="point_transactions"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
