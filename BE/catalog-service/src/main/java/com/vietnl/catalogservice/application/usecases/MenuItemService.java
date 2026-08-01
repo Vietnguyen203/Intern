@@ -109,6 +109,22 @@ public class MenuItemService {
         menuItemRepository.deleteById(UUID.fromString(id));
     }
 
+    // ===== BẬT / TẮT MÓN ĂN (phục vụ tình huống hết/cảnh báo nguyên liệu) =====
+
+    public MenuItem setAvailability(String id, boolean available) {
+        MenuItem item = getById(id);
+        // Chỉ áp dụng cho món đã ACTIVE/INACTIVE — món đang PENDING (chờ duyệt) hoặc đã bị từ chối
+        // phải đi qua đúng luồng approve/reject, không bật/tắt trực tiếp qua đây.
+        if (item.getStatus() != null
+                && (item.getStatus().equals(ItemStatus.PENDING.getValue())
+                    || item.getStatus().equals(ItemStatus.REJECTED.getValue()))) {
+            throw new RuntimeException("Món đang ở trạng thái chờ duyệt/đã từ chối, không thể bật/tắt bán trực tiếp.");
+        }
+        item.setStatus(available ? ItemStatus.ACTIVE.getValue() : ItemStatus.INACTIVE.getValue());
+        item.setUpdatedAt(LocalDateTime.now());
+        return menuItemRepository.save(item);
+    }
+
     // ===== PROPOSAL WORKFLOW =====
 
     public MenuItem propose(MenuItemRequest request) {

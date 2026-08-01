@@ -17,6 +17,7 @@ import java.util.UUID;
 /**
  * 1 filter dùng chung cho cả 2 loại JWT (khách hàng vs nhân viên), chọn validator theo path:
  *  - /vouchers/**  -> JWT nhân viên (waiter xử lý lúc checkout)
+ *  - /admin/**     -> JWT nhân viên (màn quản lý tài khoản khách, chỉ xem — xem AdminAPI)
  *  - còn lại       -> JWT khách hàng (đăng nhập tài khoản loyalty)
  * Không cố "thử cả 2" trên cùng 1 path để tránh mập mờ — mỗi path chỉ chấp nhận đúng 1 loại token.
  * Token thiếu/sai/hết hạn thì bỏ qua (anonymous) — SecurityConfig sẽ tự chặn nếu path đó cần login.
@@ -45,7 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
             try {
-                if (path.startsWith("/vouchers")) {
+                if (path.startsWith("/vouchers") || path.startsWith("/admin")) {
                     String staffSubject = staffTokenValidator.validateAndGetSubject(token);
                     request.setAttribute(STAFF_SUBJECT_ATTR, staffSubject);
                     setAuthentication(staffSubject, "ROLE_STAFF");

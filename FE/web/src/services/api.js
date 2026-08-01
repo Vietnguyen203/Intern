@@ -88,7 +88,13 @@ export const apiService = {
         forgotPassword: (email) =>
             apiService.post('/users-service/forgot-password', { email }),
         resetPassword: (email, otp, newPassword) =>
-            apiService.put('/users-service/reset-password', { email, otp, password: newPassword })
+            apiService.put('/users-service/reset-password', { email, otp, password: newPassword }),
+        // Tự đăng ký tài khoản nhân viên (2 bước, xác nhận OTP qua email) — role luôn bị ép WAITER
+        // ở phía server dù userRequest có gửi gì đi nữa, xem UserService.verifyRegisterOtp.
+        register: (userRequest) =>
+            apiService.post('/users-service/register', userRequest),
+        registerVerifyOtp: (username, otp) =>
+            apiService.post('/users-service/register/verify-otp', { username, otp })
     },
 
     dashboard: {
@@ -140,11 +146,14 @@ export const apiService = {
         deleteCategory: (id) => catalogFetch('DELETE', `/catalog-service/categories/${id}`),
 
         // Menu Items
-        getItems: () => catalogFetch('GET', '/catalog-service/items'),
-        getItemsByCategory: (categoryId) => catalogFetch('GET', `/catalog-service/items/category/${categoryId}`),
+        // includeProposals=true -> admin thấy cả món PENDING (chờ duyệt) & INACTIVE (đang tắt bán).
+        // Mặc định (false/không truyền) -> backend chỉ trả món ACTIVE, dùng cho màn khách hàng/đặt món.
+        getItems: (includeProposals) => catalogFetch('GET', `/catalog-service/items${includeProposals ? '?includeProposals=true' : ''}`),
+        getItemsByCategory: (categoryId, includeProposals) => catalogFetch('GET', `/catalog-service/items/category/${categoryId}${includeProposals ? '?includeProposals=true' : ''}`),
         createItem: (data) => catalogFetch('POST', '/catalog-service/items', data),
         updateItem: (id, data) => catalogFetch('PUT', `/catalog-service/items/${id}`, data),
         deleteItem: (id) => catalogFetch('DELETE', `/catalog-service/items/${id}`),
+        setItemAvailability: (id, available) => catalogFetch('PUT', `/catalog-service/items/${id}/availability`, { available }),
         proposeItem: (data) => catalogFetch('POST', '/catalog-service/items/propose', data),
         approveItem: (id) => catalogFetch('PUT', `/catalog-service/items/${id}/approve`),
         rejectItem: (id) => catalogFetch('PUT', `/catalog-service/items/${id}/reject`),
@@ -227,7 +236,9 @@ export const apiService = {
     // dưới đây đã theo đúng contract đã chốt, sẵn sàng chạy thật ngay khi loyalty-service lên route ở gateway.
     loyalty: {
         // --- Khách hàng tự quản lý tài khoản (auth: customer token) ---
+        // register giờ là bước 1/2 (gửi OTP về email) — chưa có token, phải gọi tiếp registerVerifyOtp.
         register: (data) => loyaltyFetch('POST', '/customers/register', data, 'none'),
+        registerVerifyOtp: (phone, otp) => loyaltyFetch('POST', '/customers/register/verify-otp', { phone, otp }, 'none'),
         login: (data) => loyaltyFetch('POST', '/customers/login', data, 'none'),
         me: () => loyaltyFetch('GET', '/customers/me', undefined, 'customer'),
         pointsHistory: () => loyaltyFetch('GET', '/customers/me/points-history', undefined, 'customer'),
@@ -240,6 +251,12 @@ export const apiService = {
         // --- Nhân viên dùng lúc checkout (auth: staff token, không phải customer token) ---
         validateVoucher: (code) => loyaltyFetch('POST', `/vouchers/${code}/validate`, undefined, 'staff'),
         useVoucher: (code, orderId) => loyaltyFetch('POST', `/vouchers/${code}/use`, { orderId }, 'staff'),
+
+        // --- Nhân viên xem danh sách/chi tiết tài khoản khách (màn "Tài khoản" > tab "Khách hàng") ---
+        // CHỈ ĐỌC — không có hàm sửa/xoá khách nào ở đây, đúng yêu cầu quản lý nhưng không đổi thông tin.
+        adminListCustomers: () => loyaltyFetch('GET', '/admin/customers', undefined, 'staff'),
+        adminGetCustomer: (id) => loyaltyFetch('GET', `/admin/customers/${id}`, undefined, 'staff'),
+        adminGetCustomerPointsHistory: (id) => loyaltyFetch('GET', `/admin/customers/${id}/points-history`, undefined, 'staff'),
     }
 };
 

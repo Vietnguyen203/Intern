@@ -60,8 +60,38 @@ public class UserAPI {
                                                 "token", response.getToken()));
         }
 
+        // ===== REGISTER (self-service, public — 2 bước qua OTP email) =====
+        // LƯU Ý BẢO MẬT: role/status trong request bị bỏ qua hoàn toàn ở bước verify — luôn tạo ra
+        // WAITER + ACTIVE. Không dùng UserRequest.role ở đây dù DTO có field đó (dùng chung DTO với
+        // /create để tái dùng validate, không phải vì cho phép client chọn role).
+        @PostMapping("/register")
+        public ResponseEntity<?> register(@RequestBody UserRequest request) {
+                LoginResponse response = userService.register(request);
+                return ResponseEntity.ok(
+                                Map.of(
+                                                "code", "200",
+                                                "status", response.getStatus(),
+                                                "message", response.getMessage()));
+        }
+
+        @PostMapping("/register/verify-otp")
+        public ResponseEntity<?> verifyRegisterOtp(@RequestBody VerifyLoginOtpRequest request) {
+                LoginResponse response = userService.verifyRegisterOtp(request.getUsername(), request.getOtp());
+                return ResponseEntity.ok(
+                                Map.of(
+                                                "code", "200",
+                                                "status", response.getStatus(),
+                                                "message", response.getMessage(),
+                                                "token", response.getToken() != null ? response.getToken() : ""));
+        }
+
         // ===== CREATE USER =====
+        // ADMIN-only: trước đây endpoint này public hoàn toàn (không @PreAuthorize) trong khi
+        // SecurityConfig permitAll() cả path /users-service/request/** — nghĩa là bất kỳ ai cũng có
+        // thể tự tạo tài khoản ADMIN bằng cách POST thẳng, không cần đăng nhập. Khoá lại vì giờ đã có
+        // cửa đăng ký công khai riêng (/register) — không nên để 2 cửa tạo tài khoản cùng mở.
         @PostMapping
+        @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<?> create(@RequestBody UserRequest request) {
 
                 User createdUser = userService.create(request);

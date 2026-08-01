@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -29,7 +30,14 @@ public class CustomerAPI {
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Đăng ký thành công", customerService.register(req)));
+        return ResponseEntity.ok(ApiResponse.success("Mã OTP đã được gửi về email của bạn", customerService.register(req)));
+    }
+
+    @PostMapping("/register/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyRegisterOtp(@RequestBody Map<String, String> body) {
+        String phone = body.get("phone");
+        String otp = body.get("otp");
+        return ResponseEntity.ok(ApiResponse.success("Đăng ký thành công", customerService.verifyRegisterOtp(phone, otp)));
     }
 
     @PostMapping("/login")

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Utensils, ClipboardList, Settings, LogOut, Menu, X, Plus,
   User as UserIcon, Calendar, BarChart as BarChartIcon, TrendingUp, PieChart as PieChartIcon,
   Search, Download, Trash2, Edit, Bell, Filter, CheckCircle, XCircle, Info, RefreshCw, AlertCircle, QrCode,
-  Package, Archive, FileText, Check, Upload
+  Package, Archive, FileText, Check, Upload, Power, PowerOff
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -220,6 +220,99 @@ const LoginScreen = ({ onLoginSuccess }) => {
   const [loginOtp, setLoginOtp] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
+  // ===== Màn chọn Sign In / Sign Up / Guest dùng chung cho cả khách hàng lẫn nhân viên =====
+  // 'choose': 3 nút ban đầu | 'signin': 1 ô nhập chung, tự nhận diện SĐT (khách) vs Employee ID
+  // (nhân viên) | 'signup': đăng ký tài khoản thật, có toggle khách hàng/nhân viên, đều bắt buộc
+  // xác nhận OTP qua email trước khi tạo tài khoản. Guest không có state riêng ở đây — bấm Guest
+  // là điều hướng thẳng sang /customer?entry=guest (CustomerOrderApp.jsx tự mở modal tab Khách).
+  const [entryChoice, setEntryChoice] = useState('choose');
+  const PHONE_REGEX = /^0\d{9}$/;
+
+  const [signupRole, setSignupRole] = useState('customer'); // 'customer' | 'staff'
+  const [signupStep, setSignupStep] = useState(0); // 0: form, 1: OTP
+  const [signupForm, setSignupForm] = useState({
+    username: '', fullName: '', phone: '', email: '', citizenPid: '', birthday: '',
+    password: '', confirmPassword: '',
+  });
+  const [signupOtp, setSignupOtp] = useState('');
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupError, setSignupError] = useState('');
+  const [signupSuccess, setSignupSuccess] = useState('');
+
+  const resetToChooser = () => {
+    setEntryChoice('choose');
+    setError(''); setSuccessMessage('');
+    setSignupError(''); setSignupSuccess(''); setSignupStep(0);
+    setLoginStep(0);
+  };
+
+  const handleSignupFieldChange = (field) => (e) =>
+    setSignupForm(prev => ({ ...prev, [field]: e.target.value }));
+
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
+    setSignupError(''); setSignupSuccess('');
+    if (signupForm.password !== signupForm.confirmPassword) {
+      setSignupError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    setSignupLoading(true);
+    try {
+      if (signupRole === 'customer') {
+        const res = await apiService.loyalty.register({
+          phone: signupForm.phone.trim(),
+          password: signupForm.password,
+          fullName: signupForm.fullName.trim(),
+          email: signupForm.email.trim(),
+        });
+        const data = res.data || res;
+        if (data.status !== 'REQUIRE_OTP') throw new Error('Không nhận được phản hồi hợp lệ từ server.');
+        setSignupStep(1);
+        setSignupSuccess('Mã OTP xác nhận đăng ký đã được gửi về email của bạn.');
+      } else {
+        const response = await apiService.auth.register({
+          username: signupForm.username.trim(),
+          password: signupForm.password,
+          fullName: signupForm.fullName.trim(),
+          email: signupForm.email.trim(),
+          phoneNumber: signupForm.phone.trim(),
+          citizenPid: signupForm.citizenPid.trim(),
+          birthday: signupForm.birthday ? `${signupForm.birthday}T00:00:00` : null,
+        });
+        if (response.status !== 'REQUIRE_OTP') throw new Error('Không nhận được phản hồi hợp lệ từ server.');
+        setSignupStep(1);
+        setSignupSuccess(response.message || 'Mã OTP xác nhận đăng ký đã được gửi về email của bạn.');
+      }
+    } catch (err) {
+      setSignupError(err.message || 'Đăng ký thất bại, vui lòng thử lại.');
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
+  const handleSignupVerifyOtp = async (e) => {
+    e.preventDefault();
+    setSignupError('');
+    setSignupLoading(true);
+    try {
+      if (signupRole === 'customer') {
+        const res = await apiService.loyalty.registerVerifyOtp(signupForm.phone.trim(), signupOtp.trim());
+        const data = res.data || res;
+        if (!data.token) throw new Error('Xác nhận OTP thất bại.');
+        localStorage.setItem('customerToken', data.token);
+        window.location.href = '/customer';
+      } else {
+        const response = await apiService.auth.registerVerifyOtp(signupForm.username.trim(), signupOtp.trim());
+        if (!response.token) throw new Error('Xác nhận OTP thất bại.');
+        handleSuccessfulLogin(response.token);
+      }
+    } catch (err) {
+      setSignupError(err.message || 'Xác nhận OTP thất bại.');
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
   // Lấy hoặc tạo Device ID chuẩn UUID cho trình duyệt này
   const getDeviceId = () => {
     let id = localStorage.getItem('deviceId');
@@ -241,9 +334,21 @@ const LoginScreen = ({ onLoginSuccess }) => {
     setError('');
     setSuccessMessage('');
 
+    const identifier = empId.trim();
     try {
+      // Sign In dùng chung 1 ô nhập: SĐT dạng 0xxxxxxxxx -> tài khoản khách hàng (loyalty-service),
+      // còn lại coi là Employee ID -> luồng đăng nhập nhân viên (users-service) như cũ bên dưới.
+      if (PHONE_REGEX.test(identifier)) {
+        const res = await apiService.loyalty.login({ phone: identifier, password });
+        const data = res.data || res;
+        if (!data.token) throw new Error('Không nhận được token từ server');
+        localStorage.setItem('customerToken', data.token);
+        window.location.href = '/customer';
+        return;
+      }
+
       const deviceId = getDeviceId();
-      const response = await apiService.auth.login(empId, password, deviceId);
+      const response = await apiService.auth.login(identifier, password, deviceId);
       // BE trả về: { code, status, message, token }
 
       if (response.status === 'REQUIRE_OTP') {
@@ -257,7 +362,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
       handleSuccessfulLogin(token);
     } catch (err) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setLoading(false);
     }
@@ -361,12 +466,18 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
           <div style={{ marginBottom: '40px' }}>
             <h2 style={{ fontSize: '32px', color: 'var(--text-primary)', marginBottom: '8px' }}>
-              {isForgotPassword ? (forgotStep === 1 ? 'Reset Password' : 'Enter OTP') : 'Welcome back'}
+              {isForgotPassword
+                ? (forgotStep === 1 ? 'Reset Password' : 'Enter OTP')
+                : entryChoice === 'choose' ? 'Xin chào'
+                : entryChoice === 'signin' ? 'Welcome back'
+                : 'Tạo tài khoản mới'}
             </h2>
             <p style={{ color: 'var(--text-secondary)' }}>
               {isForgotPassword
                 ? (forgotStep === 1 ? 'Enter your email to receive an OTP.' : 'Check your email for the 6-digit OTP code.')
-                : 'Please enter your details to sign in.'}
+                : entryChoice === 'choose' ? 'Bạn muốn tiếp tục với vai trò nào?'
+                : entryChoice === 'signin' ? 'Please enter your details to sign in.'
+                : 'Điền thông tin để đăng ký tài khoản mới — cần xác nhận OTP qua email.'}
             </p>
           </div>
 
@@ -382,60 +493,10 @@ const LoginScreen = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {!isForgotPassword ? (
-            // --- LOGIN FORM ---
-            loginStep === 0 ? (
-              <form onSubmit={handleLogin}>
-                <div className="form-group">
-                  <label className="form-label">Employee ID</label>
-                  <input type="text" className="form-input" value={empId} onChange={e => setEmpId(e.target.value)} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Password</label>
-                  <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} required />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                  <div />
-                  <button type="button" onClick={toggleForgotPassword} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--primary)', fontWeight: '500', padding: 0 }}>Forgot password?</button>
-                </div>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '16px' }} disabled={loading}>
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </button>
-              </form>
-            ) : (
-              // --- LOGIN OTP STEP ---
-              <form onSubmit={handleVerifyLoginOTP}>
-                <div className="form-group">
-                  <label className="form-label">Nhập mã OTP (từ Email)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="______"
-                    maxLength={6}
-                    value={loginOtp}
-                    onChange={e => setLoginOtp(e.target.value)}
-                    required
-                    style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: '800' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', cursor: 'pointer' }} onClick={() => setRememberMe(!rememberMe)}>
-                  <div style={{ width: '18px', height: '18px', border: '2px solid #11117F', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: rememberMe ? '#11117F' : 'transparent', transition: 'all 0.2s' }}>
-                    {rememberMe && <CheckCircle size={14} color="white" />}
-                  </div>
-                  <span style={{ fontSize: '14px', color: '#11117F', fontWeight: '600' }}>Ghi nhớ đăng nhập trong 30 ngày</span>
-                </div>
-
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '16px', marginBottom: '16px' }} disabled={loading}>
-                  {loading ? 'Verifying...' : 'Xác nhận OTP'}
-                </button>
-                <button type="button" onClick={() => setLoginStep(0)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-secondary)' }}>
-                  Quay lại đăng nhập
-                </button>
-              </form>
-            )
-          ) : forgotStep === 1 ? (
+          {isForgotPassword ? (
+            forgotStep === 1 ? (
             // --- FORGOT PASSWORD STEP 1 ---
-            <form onSubmit={handleSendOtp}>
+            <form onSubmit={handleSendOTP}>
               <div className="form-group">
                 <label className="form-label">Email Address</label>
                 <input type="email" className="form-input" placeholder="user@example.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required />
@@ -465,12 +526,198 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 <button type="button" onClick={toggleForgotPassword} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '500' }}>← Cancel</button>
               </div>
             </form>
+            )
+          ) : entryChoice === 'choose' ? (
+            // --- CHOOSER: Sign In / Sign Up / Guest ---
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <button
+                type="button"
+                onClick={() => { setEntryChoice('signin'); setError(''); setSuccessMessage(''); }}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '16px' }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEntryChoice('signup'); setSignupError(''); setSignupSuccess(''); setSignupStep(0); }}
+                className="btn btn-secondary"
+                style={{ width: '100%', padding: '16px' }}
+              >
+                Sign Up
+              </button>
+              <button
+                type="button"
+                onClick={() => { window.location.href = '/customer?entry=guest'; }}
+                style={{ width: '100%', padding: '16px', background: 'none', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)' }}
+              >
+                Guest
+              </button>
+            </div>
+          ) : entryChoice === 'signin' ? (
+            // --- SIGN IN (dùng chung: SĐT -> khách hàng, Employee ID -> nhân viên) ---
+            loginStep === 0 ? (
+              <form onSubmit={handleLogin}>
+                <div className="form-group">
+                  <label className="form-label">Số điện thoại hoặc Employee ID</label>
+                  <input type="text" className="form-input" value={empId} onChange={e => setEmpId(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Password</label>
+                  <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} required />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                  <div />
+                  <button type="button" onClick={toggleForgotPassword} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--primary)', fontWeight: '500', padding: 0 }}>Forgot password?</button>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '16px' }} disabled={loading}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </button>
+              </form>
+            ) : (
+              // --- LOGIN OTP STEP (chỉ áp dụng cho nhân viên — khách hàng không qua bước này) ---
+              <form onSubmit={handleVerifyLoginOTP}>
+                <div className="form-group">
+                  <label className="form-label">Nhập mã OTP (từ Email)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="______"
+                    maxLength={6}
+                    value={loginOtp}
+                    onChange={e => setLoginOtp(e.target.value)}
+                    required
+                    style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: '800' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', cursor: 'pointer' }} onClick={() => setRememberMe(!rememberMe)}>
+                  <div style={{ width: '18px', height: '18px', border: '2px solid #11117F', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: rememberMe ? '#11117F' : 'transparent', transition: 'all 0.2s' }}>
+                    {rememberMe && <CheckCircle size={14} color="white" />}
+                  </div>
+                  <span style={{ fontSize: '14px', color: '#11117F', fontWeight: '600' }}>Ghi nhớ đăng nhập trong 30 ngày</span>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '16px', marginBottom: '16px' }} disabled={loading}>
+                  {loading ? 'Verifying...' : 'Xác nhận OTP'}
+                </button>
+                <button type="button" onClick={() => setLoginStep(0)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                  Quay lại đăng nhập
+                </button>
+              </form>
+            )
+          ) : (
+            // --- SIGN UP (khách hàng hoặc nhân viên, đều phải xác nhận OTP qua email) ---
+            signupStep === 0 ? (
+              <form onSubmit={handleSignupSubmit}>
+                <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-app)', padding: '4px', borderRadius: '10px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSignupRole('customer')}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '13px', backgroundColor: signupRole === 'customer' ? 'var(--primary)' : 'transparent', color: signupRole === 'customer' ? '#FFF' : 'var(--text-secondary)' }}
+                  >
+                    Khách hàng
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSignupRole('staff')}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '13px', backgroundColor: signupRole === 'staff' ? 'var(--primary)' : 'transparent', color: signupRole === 'staff' ? '#FFF' : 'var(--text-secondary)' }}
+                  >
+                    Nhân viên
+                  </button>
+                </div>
+
+                {signupRole === 'staff' && (
+                  <div className="form-group">
+                    <label className="form-label">Employee ID</label>
+                    <input type="text" className="form-input" value={signupForm.username} onChange={handleSignupFieldChange('username')} required />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Họ tên</label>
+                  <input type="text" className="form-input" value={signupForm.fullName} onChange={handleSignupFieldChange('fullName')} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Số điện thoại</label>
+                  <input type="tel" className="form-input" value={signupForm.phone} onChange={handleSignupFieldChange('phone')} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email (để nhận mã OTP)</label>
+                  <input type="email" className="form-input" value={signupForm.email} onChange={handleSignupFieldChange('email')} required />
+                </div>
+                {signupRole === 'staff' && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Căn cước công dân (CCCD)</label>
+                      <input type="text" className="form-input" value={signupForm.citizenPid} onChange={handleSignupFieldChange('citizenPid')} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Ngày sinh</label>
+                      <input type="date" className="form-input" value={signupForm.birthday} onChange={handleSignupFieldChange('birthday')} required />
+                    </div>
+                  </>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Mật khẩu</label>
+                  <input type="password" className="form-input" value={signupForm.password} onChange={handleSignupFieldChange('password')} required minLength={6} />
+                </div>
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label">Xác nhận mật khẩu</label>
+                  <input type="password" className="form-input" value={signupForm.confirmPassword} onChange={handleSignupFieldChange('confirmPassword')} required minLength={6} />
+                </div>
+
+                {signupError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'rgba(244, 67, 54, 0.1)', color: 'var(--status-cancelled)', borderRadius: 'var(--radius-md)', marginBottom: '20px', fontSize: '14px' }}>
+                    <AlertCircle size={16} /> {signupError}
+                  </div>
+                )}
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '16px' }} disabled={signupLoading}>
+                  {signupLoading ? 'Đang xử lý...' : 'Đăng ký'}
+                </button>
+              </form>
+            ) : (
+              // --- SIGN UP OTP STEP ---
+              <form onSubmit={handleSignupVerifyOtp}>
+                <div className="form-group">
+                  <label className="form-label">Nhập mã OTP (từ Email)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="______"
+                    maxLength={6}
+                    value={signupOtp}
+                    onChange={e => setSignupOtp(e.target.value)}
+                    required
+                    style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: '800' }}
+                  />
+                </div>
+
+                {signupSuccess && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'rgba(76, 175, 80, 0.1)', color: 'var(--status-completed)', borderRadius: 'var(--radius-md)', marginBottom: '20px', fontSize: '14px' }}>
+                    <AlertCircle size={16} /> {signupSuccess}
+                  </div>
+                )}
+                {signupError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'rgba(244, 67, 54, 0.1)', color: 'var(--status-cancelled)', borderRadius: 'var(--radius-md)', marginBottom: '20px', fontSize: '14px' }}>
+                    <AlertCircle size={16} /> {signupError}
+                  </div>
+                )}
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '16px', marginBottom: '16px' }} disabled={signupLoading}>
+                  {signupLoading ? 'Đang xác nhận...' : 'Xác nhận OTP'}
+                </button>
+                <button type="button" onClick={() => setSignupStep(0)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                  Quay lại
+                </button>
+              </form>
+            )
           )}
 
-          {!isForgotPassword && (
+          {!isForgotPassword && entryChoice !== 'choose' && (
             <div style={{ textAlign: 'center', marginTop: '24px' }}>
-              <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Don't have an account? </span>
-              <a href="#" style={{ fontSize: '14px', color: 'var(--primary)', textDecoration: 'none', fontWeight: '500' }}>Contact Admin</a>
+              <button type="button" onClick={resetToChooser} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--primary)', fontWeight: '500' }}>
+                ← Quay lại
+              </button>
             </div>
           )}
         </div>
@@ -867,7 +1114,7 @@ const DashboardScreen = ({ user, onLogout }) => {
     vi: {
       // Nav
       overview: 'Tổng quan', orders: 'Đơn hàng', tables: 'Lịch Sử',
-      kitchen: 'Bếp', menu: 'Thực đơn', staff: 'Nhân viên',
+      kitchen: 'Bếp', menu: 'Thực đơn', staff: 'Nhân viên', accounts: 'Tài khoản',
       reports: 'Báo cáo', settings: 'Cài đặt', inventory: 'Quản lý kho', profile: 'Hồ Sơ',
       // Profile page
       profileTitle: 'Hồ Sơ Cá Nhân', profileSubtitle: 'Thông tin tài khoản của bạn',
@@ -1129,11 +1376,22 @@ const DashboardScreen = ({ user, onLogout }) => {
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
   const [loadingConfig, setLoadingConfig] = useState({
-    overview: true, orders: false, foods: false, staff: false, tables: false, inventory: false
+    overview: true, orders: false, foods: false, staff: false, tables: false, inventory: false, customers: false
   });
+
+  // Tab "Tài khoản" (trước đây là "Nhân viên"): 2 sub-tab — nhân viên (giữ nguyên như cũ) và
+  // khách hàng (mới, chỉ xem — không có form sửa/xoá khách nào).
+  const [accountSubTab, setAccountSubTab] = useState('staff'); // 'staff' | 'customer'
+  const [customers, setCustomers] = useState([]);
+  const [customerDetail, setCustomerDetail] = useState(null);
+  const [customerDetailLoading, setCustomerDetailLoading] = useState(false);
+  const [showCustomerDetailModal, setShowCustomerDetailModal] = useState(false);
 
   // Inventory States
   const [ingredients, setIngredients] = useState([]);
+  // { [foodId]: string[] } -- tên các nguyên liệu đang ở mức cảnh báo (currentStock <= minStock) trong công thức của món đó.
+  // Dùng để gợi ý cho admin món nào nên cân nhắc tắt bán / cần xác nhận thêm khi bật lại.
+  const [foodLowStockMap, setFoodLowStockMap] = useState({});
   const [inventoryTransactions, setInventoryTransactions] = useState([]);
   const [inventoryTab, setInventoryTab] = useState('ingredients'); // 'ingredients' | 'recipes' | 'transactions'
   const [selectedMenuItemForRecipe, setSelectedMenuItemForRecipe] = useState(null);
@@ -1290,7 +1548,7 @@ const DashboardScreen = ({ user, onLogout }) => {
     { icon: <LayoutDashboard size={20} />,label: 'Tables',     display: t.tables,    roles: ['ADMIN', 'WAITER'] },
     { icon: <Utensils size={20} />,       label: 'Kitchen',    display: t.kitchen,   roles: ['ADMIN', 'KITCHEN'] },
     { icon: <Utensils size={20} />,       label: 'Menu & Food',display: t.menu,      roles: ['ADMIN', 'KITCHEN'] },
-    { icon: <Users size={20} />,          label: 'Staff',      display: t.staff,     roles: ['ADMIN'] },
+    { icon: <Users size={20} />,          label: 'Staff',      display: t.accounts,  roles: ['ADMIN'] },
     { icon: <Package size={20} />,        label: 'Inventory',  display: t.inventory, roles: ['ADMIN'] },
     { icon: <PieChartIcon size={20} />,   label: 'Reports',    display: t.reports,   roles: ['ADMIN'] },
     { icon: <Settings size={20} />,       label: 'Settings',   display: t.settings,  roles: ['ADMIN', 'WAITER', 'KITCHEN'] },
@@ -1322,6 +1580,13 @@ const DashboardScreen = ({ user, onLogout }) => {
     }
     else if (activeTab === 'Inventory') fetchInventoryData();
   }, [activeTab]);
+
+  // Tab "Tài khoản" > sub-tab "Khách hàng": tải danh sách khách khi chuyển sang sub-tab này lần đầu.
+  useEffect(() => {
+    if (activeTab === 'Staff' && accountSubTab === 'customer' && customers.length === 0) {
+      fetchCustomersData();
+    }
+  }, [activeTab, accountSubTab]);
 
   const [reportSubTab, setReportSubTab] = useState('REVENUE'); // 'REVENUE' | 'COMPARISON'
   const [compDate, setCompDate] = useState(() => {
@@ -1555,7 +1820,7 @@ const DashboardScreen = ({ user, onLogout }) => {
       const [ordersRes, tablesRes, foodsRes] = await Promise.allSettled([
         apiService.order.getAll(),
         apiService.dashboard.getTables(),
-        apiService.catalog.getItems()
+        apiService.catalog.getItems(true)
       ]);
 
       console.log('Orders Response:', ordersRes);
@@ -1862,7 +2127,8 @@ const DashboardScreen = ({ user, onLogout }) => {
     setLoadingConfig(prev => ({ ...prev, foods: true }));
     try {
       const [itemsRes, catsRes, ingRes] = await Promise.all([
-        apiService.catalog.getItems(),
+        // true -> admin thấy cả món đang tắt bán (INACTIVE) và món chờ duyệt (PENDING) để còn quản lý được
+        apiService.catalog.getItems(true),
         apiService.catalog.getCategories(),
         apiService.catalog.getIngredients(),
       ]);
@@ -1873,6 +2139,41 @@ const DashboardScreen = ({ user, onLogout }) => {
     finally { setLoadingConfig(prev => ({ ...prev, foods: false })); }
   };
 
+  // Khi admin mở xem 1 danh mục ở tab Menu & Food, tính sẵn cảnh báo nguyên liệu cho từng món
+  // trong danh mục đó (dựa trên công thức + tồn kho hiện có) để gợi ý món nào nên cân nhắc tắt bán.
+  useEffect(() => {
+    if (activeTab !== 'Menu & Food' || !selectedCategory) return;
+    const catFoodIds = foods
+      .filter(f => f.categoryId === selectedCategory.id && f.status !== 2)
+      .map(f => f.id);
+    if (catFoodIds.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const entries = await Promise.all(catFoodIds.map(async (foodId) => {
+          try {
+            const res = await apiService.catalog.getRecipes(foodId);
+            const recipeItems = res.data || [];
+            const lowNames = recipeItems
+              .map(r => ingredients.find(ing => ing.id === r.ingredientId))
+              .filter(ing => ing && Number(ing.currentStock) <= Number(ing.minStock))
+              .map(ing => ing.name);
+            return [foodId, lowNames];
+          } catch {
+            return [foodId, []];
+          }
+        }));
+        if (!cancelled) {
+          setFoodLowStockMap(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+        }
+      } catch {
+        // Không chặn UI nếu tính cảnh báo thất bại — chỉ đơn giản là không hiện badge.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, selectedCategory, foods, ingredients]);
+
   const fetchStaffData = async () => {
     setLoadingConfig(prev => ({ ...prev, staff: true }));
     try {
@@ -1882,6 +2183,37 @@ const DashboardScreen = ({ user, onLogout }) => {
       toast.error('Không thể tải danh sách nhân viên: ' + error.message);
     } finally {
       setLoadingConfig(prev => ({ ...prev, staff: false }));
+    }
+  };
+
+  // Sub-tab "Khách hàng" trong "Tài khoản" — chỉ xem, không có hàm sửa/xoá khách nào.
+  const fetchCustomersData = async () => {
+    setLoadingConfig(prev => ({ ...prev, customers: true }));
+    try {
+      const res = await apiService.loyalty.adminListCustomers();
+      if (res.data) setCustomers(res.data);
+    } catch (error) {
+      toast.error('Không thể tải danh sách khách hàng: ' + error.message);
+    } finally {
+      setLoadingConfig(prev => ({ ...prev, customers: false }));
+    }
+  };
+
+  const openCustomerDetail = async (customerId) => {
+    setShowCustomerDetailModal(true);
+    setCustomerDetailLoading(true);
+    setCustomerDetail(null);
+    try {
+      const [customerRes, historyRes] = await Promise.all([
+        apiService.loyalty.adminGetCustomer(customerId),
+        apiService.loyalty.adminGetCustomerPointsHistory(customerId),
+      ]);
+      setCustomerDetail({ ...(customerRes.data || {}), pointsHistory: historyRes.data || [] });
+    } catch (error) {
+      toast.error('Không thể tải chi tiết khách hàng: ' + error.message);
+      setShowCustomerDetailModal(false);
+    } finally {
+      setCustomerDetailLoading(false);
     }
   };
 
@@ -2493,6 +2825,27 @@ const DashboardScreen = ({ user, onLogout }) => {
       toast.success('Đã xóa món ăn');
       fetchFoodsData();
     } catch (err) { toast.error('Lỗi xóa món ăn: ' + err.message); }
+  };
+
+  // Bật/tắt bán món ăn — dùng khi nguyên liệu ở mức cảnh báo (tắt tạm) hoặc đã nhập thêm hàng (bật lại).
+  const handleToggleFoodAvailability = async (food) => {
+    const turningOn = food.status === 0; // 0 = INACTIVE -> đang bật lại
+    if (turningOn) {
+      const lowStockNames = foodLowStockMap[food.id] || [];
+      if (lowStockNames.length > 0) {
+        const ok = await confirm(
+          'Nguyên liệu vẫn đang cảnh báo',
+          `Món "${food.foodName}" dùng nguyên liệu đang ở mức cảnh báo: ${lowStockNames.join(', ')}. Bạn có chắc muốn bật bán lại?`,
+          { confirmLabel: 'Vẫn bật bán' }
+        );
+        if (!ok) return;
+      }
+    }
+    try {
+      await apiService.catalog.setItemAvailability(food.id, turningOn);
+      toast.success(turningOn ? `Đã bật bán "${food.foodName}"` : `Đã tắt bán "${food.foodName}"`);
+      fetchFoodsData();
+    } catch (err) { toast.error('Lỗi cập nhật trạng thái món: ' + err.message); }
   };
 
   const handleOpenProposeFoodModal = async () => {
@@ -3314,7 +3667,7 @@ const DashboardScreen = ({ user, onLogout }) => {
                             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px', minHeight: '20px' }}>{cat.description || '—'}</p>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary)', background: 'var(--primary-light)', padding: '4px 10px', borderRadius: '20px' }}>
-                                {foods.filter(f => f.categoryId === cat.id).length} món
+                                {foods.filter(f => f.categoryId === cat.id && f.status !== 2).length} món
                               </span>
                               {user?.role === 'ADMIN' && (
                                 <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
@@ -3352,7 +3705,8 @@ const DashboardScreen = ({ user, onLogout }) => {
                   </div>
 
                   {(() => {
-                    const catFoods = foods.filter(f => f.categoryId === selectedCategory.id);
+                    // status === 2 (PENDING/chờ duyệt) đã có khu vực "Đề xuất chờ duyệt" riêng ở trên, không lặp lại ở đây
+                    const catFoods = foods.filter(f => f.categoryId === selectedCategory.id && f.status !== 2);
                     return catFoods.length === 0 ? (
                       <div className="card" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                         <p style={{ fontSize: '48px', margin: '0 0 16px' }}>🍽️</p>
@@ -3363,8 +3717,21 @@ const DashboardScreen = ({ user, onLogout }) => {
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
-                        {catFoods.map(food => (
-                          <div key={food.id} className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        {catFoods.map(food => {
+                          const isOff = food.status === 0; // INACTIVE — đang tắt bán
+                          const lowStockNames = foodLowStockMap[food.id] || [];
+                          return (
+                          <div key={food.id} className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', opacity: isOff ? 0.55 : 1 }}>
+                            {isOff && (
+                              <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 2, backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#fff', fontSize: '11px', fontWeight: '700', padding: '4px 10px', borderRadius: '20px' }}>
+                                ⏸️ Ngừng bán
+                              </div>
+                            )}
+                            {!isOff && lowStockNames.length > 0 && (
+                              <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 2, backgroundColor: 'rgba(239, 68, 68, 0.92)', color: '#fff', fontSize: '11px', fontWeight: '700', padding: '4px 10px', borderRadius: '20px' }} title={`Nguyên liệu sắp hết: ${lowStockNames.join(', ')}`}>
+                                ⚠️ Nguyên liệu sắp hết
+                              </div>
+                            )}
                             <div style={{ height: '150px', backgroundColor: 'var(--bg-app)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                               {food.imageUrl ? (
                                 <img
@@ -3420,6 +3787,13 @@ const DashboardScreen = ({ user, onLogout }) => {
                                 </p>
                                 {user?.role === 'ADMIN' && (
                                   <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                      onClick={() => handleToggleFoodAvailability(food)}
+                                      title={isOff ? 'Bật bán lại' : 'Tắt bán tạm thời'}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: isOff ? '#10B981' : '#F59E0B' }}
+                                    >
+                                      {isOff ? <Power size={15} /> : <PowerOff size={15} />}
+                                    </button>
                                     <button onClick={() => handleOpenFoodModal(food)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><Settings size={15} /></button>
                                     <button onClick={() => handleDeleteFood(food.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-cancelled)' }}><LogOut size={15} /></button>
                                   </div>
@@ -3427,7 +3801,8 @@ const DashboardScreen = ({ user, onLogout }) => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })()}
@@ -3803,72 +4178,216 @@ const DashboardScreen = ({ user, onLogout }) => {
               </div>
             </motion.div>
           )}
-          {/* STAFF TAB */}
+          {/* TÀI KHOẢN TAB (trước đây "Staff") — 2 sub-tab: Nhân viên (giữ nguyên) / Khách hàng (mới, chỉ xem) */}
           {activeTab === 'Staff' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card" style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '20px', fontWeight: '600' }}>Staff Directory</h3>
-                <button onClick={() => handleOpenStaffModal()} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '14px' }}>
-                  <Users size={16} /> Add Staff
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-app)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <button
+                    onClick={() => setAccountSubTab('staff')}
+                    style={{
+                      padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                      backgroundColor: accountSubTab === 'staff' ? 'var(--primary)' : 'transparent',
+                      color: accountSubTab === 'staff' ? '#FFF' : 'var(--text-secondary)', transition: 'all 0.15s'
+                    }}
+                  >
+                    Nhân viên
+                  </button>
+                  <button
+                    onClick={() => setAccountSubTab('customer')}
+                    style={{
+                      padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                      backgroundColor: accountSubTab === 'customer' ? 'var(--primary)' : 'transparent',
+                      color: accountSubTab === 'customer' ? '#FFF' : 'var(--text-secondary)', transition: 'all 0.15s'
+                    }}
+                  >
+                    Khách hàng
+                  </button>
+                </div>
+                {accountSubTab === 'staff' ? (
+                  <button onClick={() => handleOpenStaffModal()} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '14px' }}>
+                    <Users size={16} /> Add Staff
+                  </button>
+                ) : (
+                  <button onClick={() => fetchCustomersData()} className="btn-ghost" style={{ padding: '8px 16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)' }}>
+                    <RefreshCw size={16} /> Làm mới
+                  </button>
+                )}
               </div>
 
-              {loadingConfig.staff ? (
-                <p style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Loading staff data...</p>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-app)' }}>
-                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>ID</th>
-                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Full Name</th>
-                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Birthday</th>
-                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Role</th>
-                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Contact</th>
-                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Server</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {staff.map((person) => {
-                        const roleLabel = { 0: 'WAITER', 1: 'ADMIN', 2: 'CHEF', 3: 'KITCHEN' }[person.role] || String(person.role);
-                        const roleBg = { 0: '#EFF6FF', 1: '#FEF3C7', 2: '#D1FAE5', 3: '#FFF7ED' }[person.role] || '#EFF6FF';
-                        const roleColor = { 0: '#1D4ED8', 1: '#92400E', 2: '#065F46', 3: '#C2410C' }[person.role] || '#1D4ED8';
-                        return (
-                          <tr key={person.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                            <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.id}</td>
-                            <td style={{ padding: '16px', fontWeight: '700', color: '#11117F' }}>{person.fullName || 'N/A'}</td>
-                            <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Calendar size={14} style={{ opacity: 0.6 }} />
-                                {formatDate(person.birthday)}
-                              </div>
-                            </td>
-                            <td style={{ padding: '16px' }}>
-                              <span style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '12px', backgroundColor: roleBg, border: `1px solid ${roleColor}40`, fontWeight: '700', color: roleColor }}>
-                                {roleLabel}
-                              </span>
-                            </td>
-                            <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                              <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{person.phoneNumber || '-'}</div>
-                              <div style={{ opacity: 0.8 }}>{person.email || '-'}</div>
-                            </td>
-                            <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                                <button onClick={() => handleOpenStaffModal(person)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px' }} title="Chỉnh sửa"><Settings size={16} /></button>
-                                <button onClick={() => handleDeleteStaff(person.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-cancelled)', padding: '4px' }} title="Xóa nhân viên"><LogOut size={16} /></button>
-                              </div>
-                            </td>
+              {accountSubTab === 'staff' && (
+                <>
+                  <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Staff Directory</h3>
+                  {loadingConfig.staff ? (
+                    <p style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Loading staff data...</p>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-app)' }}>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>ID</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Full Name</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Birthday</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Role</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Contact</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Server</th>
                           </tr>
-                        );
-                      })}
-                      {staff.length === 0 && (
-                        <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No staff found.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody>
+                          {staff.map((person) => {
+                            const roleLabel = { 0: 'WAITER', 1: 'ADMIN', 2: 'CHEF', 3: 'KITCHEN' }[person.role] || String(person.role);
+                            const roleBg = { 0: '#EFF6FF', 1: '#FEF3C7', 2: '#D1FAE5', 3: '#FFF7ED' }[person.role] || '#EFF6FF';
+                            const roleColor = { 0: '#1D4ED8', 1: '#92400E', 2: '#065F46', 3: '#C2410C' }[person.role] || '#1D4ED8';
+                            return (
+                              <tr key={person.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.id}</td>
+                                <td style={{ padding: '16px', fontWeight: '700', color: '#11117F' }}>{person.fullName || 'N/A'}</td>
+                                <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Calendar size={14} style={{ opacity: 0.6 }} />
+                                    {formatDate(person.birthday)}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '16px' }}>
+                                  <span style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '12px', backgroundColor: roleBg, border: `1px solid ${roleColor}40`, fontWeight: '700', color: roleColor }}>
+                                    {roleLabel}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                  <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{person.phoneNumber || '-'}</div>
+                                  <div style={{ opacity: 0.8 }}>{person.email || '-'}</div>
+                                </td>
+                                <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                                    <button onClick={() => handleOpenStaffModal(person)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px' }} title="Chỉnh sửa"><Settings size={16} /></button>
+                                    <button onClick={() => handleDeleteStaff(person.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-cancelled)', padding: '4px' }} title="Xóa nhân viên"><LogOut size={16} /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {staff.length === 0 && (
+                            <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No staff found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {accountSubTab === 'customer' && (
+                <>
+                  <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '4px' }}>Danh sách khách hàng</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Chỉ xem — không thể chỉnh sửa thông tin khách hàng ở đây.</p>
+                  {loadingConfig.customers ? (
+                    <p style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Đang tải danh sách khách hàng...</p>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-app)' }}>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Họ tên</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Liên hệ</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Hạng</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Điểm</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Đã chi tiêu</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Trạng thái</th>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customers.map((c) => {
+                            const tierColorMap = { BRONZE: '#B45309', SILVER: '#64748B', GOLD: '#CA8A04', DIAMOND: '#0891B2' };
+                            const tierColor = tierColorMap[c.tierRank] || '#64748B';
+                            const isLocked = c.status === 'LOCKED';
+                            return (
+                              <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '16px', fontWeight: '700', color: '#11117F' }}>{c.fullName || 'N/A'}</td>
+                                <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                  <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{c.phone || '-'}</div>
+                                  <div style={{ opacity: 0.8 }}>{c.email || '-'}</div>
+                                </td>
+                                <td style={{ padding: '16px' }}>
+                                  <span style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '12px', backgroundColor: `${tierColor}20`, border: `1px solid ${tierColor}40`, fontWeight: '700', color: tierColor }}>
+                                    {c.tierName || c.tierRank || '-'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '16px', fontWeight: '600' }}>{(c.currentPoints ?? 0).toLocaleString('vi-VN')}</td>
+                                <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(c.totalSpent || 0)}</td>
+                                <td style={{ padding: '16px' }}>
+                                  <span style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '12px', backgroundColor: isLocked ? '#FEE2E2' : '#D1FAE5', border: `1px solid ${isLocked ? '#EF4444' : '#10B981'}40`, fontWeight: '700', color: isLocked ? '#B91C1C' : '#065F46' }}>
+                                    {isLocked ? 'Đã khoá' : 'Hoạt động'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>
+                                  <button onClick={() => openCustomerDetail(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px' }} title="Xem chi tiết"><Search size={16} /></button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {customers.length === 0 && (
+                            <tr><td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Chưa có khách hàng nào.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
+          )}
+
+          {/* MODAL: Chi tiết khách hàng (chỉ xem) */}
+          {showCustomerDetailModal && (
+            <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }} onClick={() => setShowCustomerDetailModal(false)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="card" style={{ padding: '24px', width: '100%', maxWidth: '520px', maxHeight: '85vh', overflowY: 'auto' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '700', margin: 0 }}>Chi tiết khách hàng</h3>
+                  <button onClick={() => setShowCustomerDetailModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+                </div>
+
+                {customerDetailLoading || !customerDetail ? (
+                  <p style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>Đang tải...</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Họ tên</p><p style={{ margin: '2px 0 0', fontWeight: '600' }}>{customerDetail.fullName || 'N/A'}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>SĐT</p><p style={{ margin: '2px 0 0', fontWeight: '600' }}>{customerDetail.phone || '-'}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Email</p><p style={{ margin: '2px 0 0', fontWeight: '600' }}>{customerDetail.email || '-'}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Ngày tạo</p><p style={{ margin: '2px 0 0', fontWeight: '600' }}>{customerDetail.createdAt ? formatDate(customerDetail.createdAt) : '-'}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Hạng thành viên</p><p style={{ margin: '2px 0 0', fontWeight: '600' }}>{customerDetail.tierName || customerDetail.tierRank || '-'}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Trạng thái</p><p style={{ margin: '2px 0 0', fontWeight: '600' }}>{customerDetail.status === 'LOCKED' ? 'Đã khoá' : 'Hoạt động'}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Điểm hiện tại</p><p style={{ margin: '2px 0 0', fontWeight: '700', color: '#CA8A04' }}>{(customerDetail.currentPoints ?? 0).toLocaleString('vi-VN')}</p></div>
+                      <div><p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>Tổng chi tiêu</p><p style={{ margin: '2px 0 0', fontWeight: '700' }}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(customerDetail.totalSpent || 0)}</p></div>
+                    </div>
+
+                    <div>
+                      <p style={{ margin: '0 0 8px', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Lịch sử điểm</p>
+                      <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
+                        {(customerDetail.pointsHistory || []).length === 0 ? (
+                          <p style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Chưa có giao dịch điểm nào.</p>
+                        ) : (
+                          customerDetail.pointsHistory.map((tx, idx) => (
+                            <div key={tx.id || idx} style={{ padding: '10px 14px', borderBottom: idx === customerDetail.pointsHistory.length - 1 ? 'none' : '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <p style={{ margin: 0, fontSize: '13px', fontWeight: '600' }}>{tx.description || tx.type || 'Giao dịch điểm'}</p>
+                                <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-secondary)' }}>{tx.createdAt ? formatDate(tx.createdAt) : ''}</p>
+                              </div>
+                              <span style={{ fontWeight: '700', color: (tx.points ?? 0) >= 0 ? '#059669' : '#DC2626' }}>{(tx.points ?? 0) >= 0 ? '+' : ''}{tx.points ?? 0}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
           )}
 
           {/* SETTINGS TAB - System Configuration */}
@@ -5516,7 +6035,8 @@ const DashboardScreen = ({ user, onLogout }) => {
                 <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
                   <h4 style={{ margin: '0 0 16px', fontSize: '15px', color: '#475569' }}>DANH SÁCH MÓN ĂN</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
-                    {foods.map(food => (
+                    {/* Chỉ hiện món đang ACTIVE (status === 1) — món đã tắt bán hoặc đang chờ duyệt sẽ không thể chọn để lên đơn */}
+                    {foods.filter(food => food.status === 1).map(food => (
                       <div key={food.id} style={{ backgroundColor: '#FFF', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s', cursor: 'pointer' }} onClick={() => openOrderOptionsModal(food)}>
                         <div style={{ height: '120px', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {food.imageUrl ? (

@@ -41,10 +41,22 @@ const CustomerOrderApp = () => {
   // ===== TÀI KHOẢN KHÁCH HÀNG (tích điểm / hạng thành viên) =====
   const [customer, setCustomer] = useState(null); // null = chưa đăng nhập (vẫn order được bình thường)
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
-  const [authForm, setAuthForm] = useState({ phone: '', password: '', fullName: '' });
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'guest'
+  const [authForm, setAuthForm] = useState({ phone: '', password: '', fullName: '', email: '' });
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  // Đăng ký giờ là 2 bước (xác nhận OTP qua email) — false: đang điền form, true: đang chờ nhập OTP.
+  const [registerOtpStep, setRegisterOtpStep] = useState(false);
+  const [registerOtp, setRegisterOtp] = useState('');
+
+  // "Khách" (tài khoản tạm thời): chỉ cần tên + SĐT, không tích điểm/lên hạng, không gọi
+  // loyalty-service — chỉ lưu ở localStorage máy khách kèm mốc hết hạn 24h, tự hết tác dụng sau đó
+  // (không cần job dọn dẹp phía server vì không có gì được tạo ở server cả).
+  const GUEST_STORAGE_KEY = 'customerGuestProfile';
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestNameInput, setGuestNameInput] = useState('');
+  const [guestPhoneInput, setGuestPhoneInput] = useState('');
 
   const [showAccountPanel, setShowAccountPanel] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
@@ -61,6 +73,13 @@ const CustomerOrderApp = () => {
     if (tid) setTableId(tid);
     if (tname) setTableName(tname);
 
+    // Đến từ nút "Guest" ở màn chọn chung (App.jsx) -> mở thẳng modal ở tab Khách, không bắt phải
+    // tự bấm nút "Đăng nhập" trên header trước.
+    if (params.get('entry') === 'guest') {
+      setAuthMode('guest');
+      setShowAuthModal(true);
+    }
+
     fetchMenu();
 
     // Khôi phục phiên đăng nhập của khách nếu trình duyệt còn lưu token (localStorage riêng
@@ -71,33 +90,105 @@ const CustomerOrderApp = () => {
         .then(res => setCustomer(res.data || res))
         .catch(() => localStorage.removeItem('customerToken'));
     }
+
+    // Khôi phục tên+SĐT "khách tạm" nếu còn hạn (< 24h kể từ lúc tạo) — hết hạn thì âm thầm xoá.
+    try {
+      const rawGuest = localStorage.getItem(GUEST_STORAGE_KEY);
+      if (rawGuest) {
+        const parsedGuest = JSON.parse(rawGuest);
+        if (parsedGuest?.name && parsedGuest?.expiresAt && Date.now() < parsedGuest.expiresAt) {
+          setGuestName(parsedGuest.name);
+          setGuestPhone(parsedGuest.phone || '');
+        } else {
+          localStorage.removeItem(GUEST_STORAGE_KEY);
+        }
+      }
+    } catch {
+      localStorage.removeItem(GUEST_STORAGE_KEY);
+    }
   }, []);
 
+  const handleGuestContinue = () => {
+    const name = guestNameInput.trim();
+    const phone = guestPhoneInput.trim();
+    if (!name || !phone) {
+      setAuthError('Vui lòng nhập đủ tên và số điện thoại.');
+      return;
+    }
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+    localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify({ name, phone, expiresAt }));
+    setGuestName(name);
+    setGuestPhone(phone);
+    setGuestNameInput('');
+    setGuestPhoneInput('');
+    setAuthError('');
+    setShowAuthModal(false);
+  };
+
+  const handleClearGuest = () => {
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+    setGuestName('');
+    setGuestPhone('');
+  };
+
+  // Đăng nhập: 1 bước như cũ. Đăng ký: bước 1 — validate + gửi OTP, CHƯA có token/tài khoản, phải
+  // qua handleRegisterVerifyOtp bên dưới mới thực sự tạo tài khoản (xem CustomerService.register).
   const handleAuthSubmit = async () => {
     setAuthError('');
     if (!authForm.phone.trim() || !authForm.password.trim()) {
       setAuthError('Vui lòng nhập đủ số điện thoại và mật khẩu.');
       return;
     }
-    if (authMode === 'register' && !authForm.fullName.trim()) {
-      setAuthError('Vui lòng nhập họ tên.');
+    if (authMode === 'register' && (!authForm.fullName.trim() || !authForm.email.trim())) {
+      setAuthError('Vui lòng nhập đủ họ tên và email (để nhận mã OTP).');
       return;
     }
     setAuthLoading(true);
     try {
-      const payload = authMode === 'register'
-        ? { phone: authForm.phone.trim(), password: authForm.password, fullName: authForm.fullName.trim() }
-        : { phone: authForm.phone.trim(), password: authForm.password };
-      const res = authMode === 'register'
-        ? await apiService.loyalty.register(payload)
-        : await apiService.loyalty.login(payload);
-      const data = res.data || res;
-      if (data.token) localStorage.setItem('customerToken', data.token);
-      setCustomer(data.customer || data);
-      setShowAuthModal(false);
-      setAuthForm({ phone: '', password: '', fullName: '' });
+      if (authMode === 'register') {
+        const res = await apiService.loyalty.register({
+          phone: authForm.phone.trim(),
+          password: authForm.password,
+          fullName: authForm.fullName.trim(),
+          email: authForm.email.trim(),
+        });
+        const data = res.data || res;
+        if (data.status !== 'REQUIRE_OTP') throw new Error('Không nhận được phản hồi hợp lệ từ server.');
+        setRegisterOtpStep(true);
+      } else {
+        const res = await apiService.loyalty.login({ phone: authForm.phone.trim(), password: authForm.password });
+        const data = res.data || res;
+        if (data.token) localStorage.setItem('customerToken', data.token);
+        setCustomer(data.customer || data);
+        setShowAuthModal(false);
+        setAuthForm({ phone: '', password: '', fullName: '', email: '' });
+      }
     } catch (err) {
       setAuthError(err.message || 'Có lỗi xảy ra, vui lòng thử lại.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleRegisterVerifyOtp = async () => {
+    setAuthError('');
+    if (!registerOtp.trim()) {
+      setAuthError('Vui lòng nhập mã OTP.');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const res = await apiService.loyalty.registerVerifyOtp(authForm.phone.trim(), registerOtp.trim());
+      const data = res.data || res;
+      if (!data.token) throw new Error('Xác nhận OTP thất bại.');
+      localStorage.setItem('customerToken', data.token);
+      setCustomer(data.customer || data);
+      setShowAuthModal(false);
+      setAuthForm({ phone: '', password: '', fullName: '', email: '' });
+      setRegisterOtpStep(false);
+      setRegisterOtp('');
+    } catch (err) {
+      setAuthError(err.message || 'Xác nhận OTP thất bại.');
     } finally {
       setAuthLoading(false);
     }
@@ -144,7 +235,7 @@ const CustomerOrderApp = () => {
     try {
       const [catsRes, foodsRes] = await Promise.all([
         apiService.catalog.getCategories(),
-        apiService.catalog.getItems(true) // Get only active items
+        apiService.catalog.getItems() // Không truyền includeProposals -> backend chỉ trả món đang ACTIVE (đã tắt bán/chờ duyệt sẽ không hiện ở đây)
       ]);
       setCategories(catsRes.data || []);
       setFoods(foodsRes.data || []);
@@ -264,7 +355,9 @@ const CustomerOrderApp = () => {
         const payload = {
           tableId: tableId || null,
           tableNumber: tableName || 'Mang đi',
-          note: 'Order từ mã QR',
+          // Khách dùng "tài khoản khách" tạm thời (không có customerId, không tích điểm) thì đính kèm
+          // tên vào note để nhân viên/bếp biết đơn này của ai — customerId vẫn null như order ẩn danh.
+          note: guestName ? `Khách: ${guestName} - ${guestPhone}` : 'Order từ mã QR',
           items,
           // Gắn khách đã đăng nhập vào đơn để loyalty-service cộng điểm đúng người lúc thanh toán.
           // null nếu khách không đăng nhập — order vẫn tạo được bình thường như trước giờ.
@@ -336,6 +429,14 @@ const CustomerOrderApp = () => {
             }}>
               <Award size={16} color={(TIER_FALLBACK[customer.tierRank] || {}).color || '#FFD700'} />
               <span style={{ fontSize: '13px', fontWeight: '700' }}>{customer.fullName || customer.phone}</span>
+            </button>
+          ) : guestName ? (
+            <button onClick={() => setShowAuthModal(true)} title="Tài khoản khách tạm thời (24h) — bấm để đăng nhập/đăng ký tài khoản thật" style={{
+              display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.15)',
+              border: 'none', borderRadius: '20px', padding: '8px 14px', color: 'white', cursor: 'pointer', flexShrink: 0
+            }}>
+              <User size={16} />
+              <span style={{ fontSize: '13px', fontWeight: '700' }}>Khách: {guestName}</span>
             </button>
           ) : (
             <button onClick={() => setShowAuthModal(true)} style={{
@@ -573,59 +674,157 @@ const CustomerOrderApp = () => {
         </div>
       )}
 
-      {/* Auth Modal — Đăng nhập / Đăng ký tài khoản khách (tùy chọn, không bắt buộc để order) */}
+      {/* Auth Modal — Đăng nhập / Đăng ký / Khách (tạm thời) — tất cả đều tùy chọn, không bắt buộc để order */}
       {showAuthModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end' }}>
           <div style={{ backgroundColor: '#FFF', width: '100%', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px', paddingBottom: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#1E293B' }}>
-                {authMode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
-              </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#1E293B' }}>Tài khoản</h3>
               <button onClick={() => { setShowAuthModal(false); setAuthError(''); }} style={{ background: 'transparent', border: 'none', color: '#64748B' }}><X size={24} /></button>
             </div>
-            <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
-              Có tài khoản để tích điểm và lên hạng thành viên mỗi lần thanh toán — không bắt buộc, bạn vẫn order được như bình thường nếu bỏ qua.
-            </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {authMode === 'register' && (
-                <input
-                  type="text" placeholder="Họ và tên"
-                  value={authForm.fullName}
-                  onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
-                  style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                />
-              )}
-              <input
-                type="tel" placeholder="Số điện thoại"
-                value={authForm.phone}
-                onChange={e => setAuthForm({ ...authForm, phone: e.target.value })}
-                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-              />
-              <input
-                type="password" placeholder="Mật khẩu"
-                value={authForm.password}
-                onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-              />
+            {/* Sign In / Sign Up / Guest */}
+            <div style={{ display: 'flex', gap: '4px', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '12px', marginBottom: '18px' }}>
+              {[
+                { key: 'login', label: 'Đăng nhập' },
+                { key: 'register', label: 'Đăng ký' },
+                { key: 'guest', label: 'Khách' },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => { setAuthMode(tab.key); setAuthError(''); setRegisterOtpStep(false); }}
+                  style={{
+                    flex: 1, padding: '10px 8px', borderRadius: '9px', border: 'none', cursor: 'pointer',
+                    fontSize: '13px', fontWeight: '700',
+                    backgroundColor: authMode === tab.key ? '#11117F' : 'transparent',
+                    color: authMode === tab.key ? '#FFF' : '#64748B',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
+            {authMode !== 'guest' ? (
+              authMode === 'register' && registerOtpStep ? (
+                // --- ĐĂNG KÝ BƯỚC 2: xác nhận OTP đã gửi về email ---
+                <>
+                  <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
+                    Mã OTP xác nhận đăng ký đã được gửi về email <strong>{authForm.email}</strong>. Nhập mã để hoàn tất tạo tài khoản.
+                  </p>
+                  <input
+                    type="text" placeholder="______" maxLength={6}
+                    value={registerOtp}
+                    onChange={e => setRegisterOtp(e.target.value)}
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: '800', boxSizing: 'border-box' }}
+                  />
 
-            <button
-              onClick={handleAuthSubmit}
-              disabled={authLoading}
-              style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
-            >
-              {authLoading ? 'Đang xử lý...' : (authMode === 'login' ? 'Đăng nhập' : 'Đăng ký')}
-            </button>
+                  {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
 
-            <button
-              onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
-              style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#11117F', fontSize: '14px', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              {authMode === 'login' ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
-            </button>
+                  <button
+                    onClick={handleRegisterVerifyOtp}
+                    disabled={authLoading}
+                    style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
+                  >
+                    {authLoading ? 'Đang xác nhận...' : 'Xác nhận OTP'}
+                  </button>
+                  <button
+                    onClick={() => { setRegisterOtpStep(false); setAuthError(''); }}
+                    style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#64748B', fontSize: '14px', cursor: 'pointer' }}
+                  >
+                    ← Quay lại
+                  </button>
+                </>
+              ) : (
+              <>
+                <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
+                  {authMode === 'register'
+                    ? 'Đăng ký để tích điểm và lên hạng thành viên mỗi lần thanh toán — cần xác nhận OTP qua email.'
+                    : 'Có tài khoản để tích điểm và lên hạng thành viên mỗi lần thanh toán — không bắt buộc, bạn vẫn order được như bình thường nếu bỏ qua.'}
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {authMode === 'register' && (
+                    <input
+                      type="text" placeholder="Họ và tên"
+                      value={authForm.fullName}
+                      onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
+                      style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+                    />
+                  )}
+                  <input
+                    type="tel" placeholder="Số điện thoại"
+                    value={authForm.phone}
+                    onChange={e => setAuthForm({ ...authForm, phone: e.target.value })}
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                  {authMode === 'register' && (
+                    <input
+                      type="email" placeholder="Email (để nhận mã OTP)"
+                      value={authForm.email}
+                      onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                      style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+                    />
+                  )}
+                  <input
+                    type="password" placeholder="Mật khẩu"
+                    value={authForm.password}
+                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
+
+                <button
+                  onClick={handleAuthSubmit}
+                  disabled={authLoading}
+                  style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
+                >
+                  {authLoading ? 'Đang xử lý...' : (authMode === 'login' ? 'Đăng nhập' : 'Đăng ký')}
+                </button>
+              </>
+              )
+            ) : (
+              <>
+                <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
+                  Dùng tạm để đặt món — chỉ cần tên và số điện thoại, không cần mật khẩu. Không tích điểm hay lên hạng thành viên, và thông tin này sẽ tự xoá khỏi máy sau 24 giờ.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <input
+                    type="text" placeholder="Tên của bạn"
+                    value={guestNameInput}
+                    onChange={e => setGuestNameInput(e.target.value)}
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                  <input
+                    type="tel" placeholder="Số điện thoại"
+                    value={guestPhoneInput}
+                    onChange={e => setGuestPhoneInput(e.target.value)}
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
+
+                <button
+                  onClick={handleGuestContinue}
+                  style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
+                >
+                  Tiếp tục với tên khách
+                </button>
+
+                {guestName && (
+                  <button
+                    onClick={handleClearGuest}
+                    style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Xoá tài khoản khách hiện tại ({guestName} - {guestPhone})
+                  </button>
+                )}
+              </>
+            )}
 
             <button
               onClick={() => { setShowAuthModal(false); setAuthError(''); }}

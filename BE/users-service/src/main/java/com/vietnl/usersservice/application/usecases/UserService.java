@@ -38,6 +38,12 @@ public class UserService {
     private static final Map<String, String> otpStorage = new ConcurrentHashMap<>();
     private static final Map<String, LocalDateTime> otpExpiryStorage = new ConcurrentHashMap<>();
 
+    // Đăng ký tài khoản (self-service, KHÔNG qua admin) — cùng cơ chế OTP trong bộ nhớ như login,
+    // nhưng giữ tạm cả UserRequest đã validate (chưa lưu DB) vì user chưa tồn tại để tra cứu lại.
+    private static final Map<String, UserRequest> pendingRegistrations = new ConcurrentHashMap<>();
+    private static final Map<String, String> registerOtpStorage = new ConcurrentHashMap<>();
+    private static final Map<String, LocalDateTime> registerOtpExpiryStorage = new ConcurrentHashMap<>();
+
     public LoginResponse login(String username, String password, String deviceId) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException(ExceptionMessage.USER_NOT_FOUND.getMessage()));
@@ -147,6 +153,85 @@ public class UserService {
         return LoginResponse.builder()
                 .status("SUCCESS")
                 .message("Đăng nhập thành công")
+                .token(jwtService.generateToken(claims, username))
+                .build();
+    }
+
+    /**
+     * Tự đăng ký tài khoản (bước 1) — endpoint PUBLIC (xem UserAPI), nên KHÔNG được lưu User vào DB
+     * ngay ở đây. Validate y hệt như tạo user bình thường (dùng lại UserValidator.validateCreate,
+     * đảm bảo cùng 1 bộ quy tắc với màn Admin tạo nhân viên), giữ tạm request đã validate + gửi OTP
+     * qua email; chỉ thực sự tạo user ở verifyRegisterOtp() sau khi OTP đúng.
+     */
+    public LoginResponse register(UserRequest request) {
+        userValidator.validateCreate(request);
+
+        String otp = String.format("%06d", new Random().nextInt(999999));
+        pendingRegistrations.put(request.getUsername(), request);
+        registerOtpStorage.put(request.getUsername(), otp);
+        registerOtpExpiryStorage.put(request.getUsername(), LocalDateTime.now().plusMinutes(5));
+
+        sendOtpEmail(request.getEmail(), otp);
+
+        return LoginResponse.builder()
+                .status("REQUIRE_OTP")
+                .message("Mã OTP xác nhận đăng ký đã được gửi về email của bạn")
+                .build();
+    }
+
+    /**
+     * Tự đăng ký (bước 2) — xác nhận OTP rồi mới thực sự tạo user. Role/status KHÔNG lấy từ request
+     * gốc dù request có gửi kèm gì đi nữa — luôn ép WAITER(0) + ACTIVE, vì đây là endpoint public,
+     * không được phép tự phong bất kỳ role cao hơn nào cho chính mình.
+     */
+    public LoginResponse verifyRegisterOtp(String username, String otp) {
+        String storedOtp = registerOtpStorage.get(username);
+        LocalDateTime expiry = registerOtpExpiryStorage.get(username);
+        UserRequest pending = pendingRegistrations.get(username);
+
+        if (storedOtp == null || expiry == null || pending == null || !storedOtp.equals(otp)) {
+            throw new RuntimeException(ExceptionMessage.OTP_INVALID.getMessage());
+        }
+        if (LocalDateTime.now().isAfter(expiry)) {
+            registerOtpStorage.remove(username);
+            registerOtpExpiryStorage.remove(username);
+            pendingRegistrations.remove(username);
+            throw new RuntimeException(ExceptionMessage.OTP_EXPIRED.getMessage());
+        }
+
+        // Username có thể đã bị người khác đăng ký trong lúc chờ OTP (hiếm nhưng vẫn kiểm tra lại).
+        if (userRepository.findByUsername(username).isPresent()) {
+            registerOtpStorage.remove(username);
+            registerOtpExpiryStorage.remove(username);
+            pendingRegistrations.remove(username);
+            throw new RuntimeException(ExceptionMessage.USER_DUPLICATE.getMessage());
+        }
+
+        User user = new User();
+        user.setUsername(pending.getUsername());
+        user.setPassword(passwordEncoder.encode(pending.getPassword()));
+        user.setRole(UserRole.WAITER.getValue());
+        user.setStatus(UserStatus.ACTIVE.getValue());
+        user.setPhoneNumber(pending.getPhoneNumber());
+        user.setFullName(pending.getFullName());
+        user.setEmail(pending.getEmail());
+        user.setBirthday(pending.getBirthday());
+        user.setCitizenPid(pending.getCitizenPid());
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        registerOtpStorage.remove(username);
+        registerOtpExpiryStorage.remove(username);
+        pendingRegistrations.remove(username);
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", UserRole.WAITER.name());
+        claims.put("fullName", user.getFullName());
+
+        return LoginResponse.builder()
+                .status("SUCCESS")
+                .message("Đăng ký thành công")
                 .token(jwtService.generateToken(claims, username))
                 .build();
     }

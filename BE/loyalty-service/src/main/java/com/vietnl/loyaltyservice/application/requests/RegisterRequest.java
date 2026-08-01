@@ -1,5 +1,6 @@
 package com.vietnl.loyaltyservice.application.requests;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
@@ -20,6 +21,10 @@ public class RegisterRequest {
     @NotBlank(message = "Họ tên không được để trống")
     private String fullName;
 
+    // Bắt buộc từ khi có xác nhận OTP lúc đăng ký (trước đây tùy chọn) — OTP cần nơi để gửi tới.
+    @NotBlank(message = "Email không được để trống")
+    @Email(message = "Sai định dạng email")
     private String email;
+
     private String birthday; // ISO date string (yyyy-MM-dd), optional
 }

@@ -25,9 +25,7 @@ public class PaymentEventListener {
         try {
             loyaltyService.earnPointsForPayment(event.getCustomerId(), event.getOrderId(), event.getAmount());
         } catch (Exception ex) {
-            // Không throw lại — tránh Kafka retry vô hạn 1 message lỗi dữ liệu (poison pill).
-            // Lỗi hạ tầng tạm thời (DB down...) nên được xử lý ở tầng consumer factory (retry/backoff)
-            // chứ không phải ở đây.
+
             log.error("Lỗi xử lý PaymentCompletedEvent cho orderId={}: {}", event.getOrderId(), ex.getMessage(), ex);
         }
     }

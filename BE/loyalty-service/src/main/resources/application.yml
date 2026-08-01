@@ -15,6 +15,23 @@ spring:
     bootstrap-servers: localhost:9092
     consumer:
       group-id: loyalty-service
+  # Gửi OTP email lúc khách hàng tự đăng ký (CustomerService.register 2 bước) — dùng lại đúng tài
+  # khoản Gmail đã cấu hình bên users-service (mỗi service tự khai báo config riêng, giống cách
+  # jwt.staff.secret ở dưới cũng phải khớp thủ công với users-service, không có config dùng chung).
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: nguyenlanviet09@gmail.com
+    # LƯU Ý: phải là "Mật khẩu ứng dụng" 16 ký tự từ Google, KHÔNG dùng mật khẩu chính — xem
+    # users-service/application.properties, đây là cùng 1 giá trị.
+    password: jiswxdlkcpxxmpxl
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
 
 server:
   port: 8088

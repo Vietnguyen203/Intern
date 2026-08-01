@@ -66,6 +66,18 @@ public class MenuItemAPI {
         return ResponseEntity.ok(Map.of("code", "200", "message", "Xóa món ăn thành công"));
     }
 
+    // PUT bật/tắt bán món ăn (Admin) — vd: tắt tạm khi nguyên liệu ở mức cảnh báo
+    @PutMapping("/{id}/availability")
+    public ResponseEntity<?> setAvailability(@PathVariable String id, @RequestBody Map<String, Boolean> request) {
+        boolean available = Boolean.TRUE.equals(request.get("available"));
+        MenuItem updated = menuItemService.setAvailability(id, available);
+        return ResponseEntity.ok(Map.of(
+                "code", "200",
+                "message", available ? "Đã bật bán món ăn" : "Đã tắt bán món ăn",
+                "data", updated
+        ));
+    }
+
     // POST propose new item (Kitchen)
     @PostMapping("/propose")
     public ResponseEntity<?> propose(@RequestBody MenuItemRequest request) {
