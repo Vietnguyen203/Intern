@@ -59,6 +59,7 @@ public class OrderService {
                 item.setMenuItemId(itemReq.getMenuItemId());
                 
                 MenuItemDetails details = fetchMenuItem(itemReq.getMenuItemId(), authToken);
+                assertItemAvailable(details, itemReq.getMenuItemId());
                 if (details != null) {
                     item.setFoodName(details.getFoodName());
                     item.setUnitPrice(details.getPrice());
@@ -67,12 +68,12 @@ public class OrderService {
                     item.setUnitPrice(itemReq.getUnitPrice());
                 }
                 item.setFoodImage(details != null && details.getImage() != null ? details.getImage() : itemReq.getFoodImage());
-                
+
                 item.setQuantity(itemReq.getQuantity());
                 item.setNote(itemReq.getNote());
                 item.setKitchenStatus("PENDING");
                 order.getItems().add(item);
-                
+
                 itemsToDeduct.add(Map.of(
                         "menuItemId", item.getMenuItemId(),
                         "quantity", item.getQuantity()
@@ -152,6 +153,7 @@ public class OrderService {
                 item.setMenuItemId(itemReq.getMenuItemId());
 
                 MenuItemDetails details = fetchMenuItem(itemReq.getMenuItemId(), systemToken);
+                assertItemAvailable(details, itemReq.getMenuItemId());
                 if (details != null) {
                     item.setFoodName(details.getFoodName());
                     item.setUnitPrice(details.getPrice());
@@ -238,6 +240,7 @@ public class OrderService {
 
         String systemToken = "Bearer " + jwtUtil.generateToken("system", "ADMIN");
         MenuItemDetails details = fetchMenuItem(request.getMenuItemId(), systemToken);
+        assertItemAvailable(details, request.getMenuItemId());
 
         order.getItems().stream()
                 .filter(i -> i.getMenuItemId().equals(request.getMenuItemId()) && isSameNote(i.getNote(), request.getNote()))
@@ -566,6 +569,9 @@ public class OrderService {
         private String foodName;
         private java.math.BigDecimal price;
         private String image;
+        // ItemStatus (catalog-service): INACTIVE=0, ACTIVE=1, PENDING=2, REJECTED=-1 — trả nguyên số
+        // (menu_items.status là cột Integer thô, không phải enum name) nên đọc đúng kiểu Number.
+        private Integer status;
     }
 
     private MenuItemDetails fetchMenuItem(String menuItemId, String token) {
@@ -585,12 +591,32 @@ public class OrderService {
                     if (imgObj instanceof String) {
                         details.setImage((String) imgObj);
                     }
+                    Object statusObj = data.get("status");
+                    if (statusObj instanceof Number) {
+                        details.setStatus(((Number) statusObj).intValue());
+                    }
                     return details;
                 }
             }
         } catch (Exception e) {
         }
         return null;
+    }
+
+    /**
+     * Chặn đặt/thêm món khi biết CHẮC CHẮN món đó không ACTIVE (đã tắt bán, đang chờ duyệt, hoặc bị
+     * từ chối) ở catalog-service — trước đây chỉ frontend lọc ở màn hình (foods.filter(status===1)),
+     * backend không kiểm tra gì cả, nên 1 request POST /orders, /orders/public hay /orders/{id}/items
+     * gửi thẳng vẫn tạo được đơn chứa món không bán (vd. frontend cache cũ, hoặc gọi API trực tiếp).
+     * Chỉ chặn khi status đã biết và khác ACTIVE(1); nếu catalog-service không phản hồi được (details
+     * hoặc status null) vẫn cho qua như hành vi cũ, để không làm gãy luồng đặt món chỉ vì
+     * catalog-service tạm thời chậm/lỗi.
+     */
+    private void assertItemAvailable(MenuItemDetails details, String menuItemId) {
+        if (details != null && details.getStatus() != null && details.getStatus() != 1) {
+            String name = details.getFoodName() != null ? details.getFoodName() : menuItemId;
+            throw new RuntimeException("Món \"" + name + "\" hiện không có sẵn để đặt (đã ngừng bán hoặc đang chờ duyệt).");
+        }
     }
 
     private String fetchTableNumber(String tableId, String token) {

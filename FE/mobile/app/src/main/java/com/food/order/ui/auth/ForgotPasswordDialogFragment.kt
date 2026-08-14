@@ -18,6 +18,7 @@ class ForgotPasswordDialogFragment : DialogFragment() {
 
     // state: 1 = email input, 2 = otp + new password
     private var step = 1
+    private var storedUsername = ""
     private var storedEmail = ""
 
     companion object {
@@ -42,12 +43,13 @@ class ForgotPasswordDialogFragment : DialogFragment() {
         updateUiForStep()
 
         binding.btnSendOtp.setOnClickListener {
+            val employeeId = binding.edtEmployeeId.text?.toString()?.trim()
             val email = binding.edtEmail.text?.toString()?.trim()
-            if (email.isNullOrEmpty()) {
-                binding.edtEmail.error = "Required"
-                return@setOnClickListener
-            }
-            sendOtp(email)
+            var hasErr = false
+            if (employeeId.isNullOrEmpty()) { binding.edtEmployeeId.error = "Required"; hasErr = true }
+            if (email.isNullOrEmpty()) { binding.edtEmail.error = "Required"; hasErr = true }
+            if (hasErr) return@setOnClickListener
+            sendOtp(employeeId!!, email!!)
         }
 
         binding.btnResetPassword.setOnClickListener {
@@ -67,7 +69,7 @@ class ForgotPasswordDialogFragment : DialogFragment() {
 
     private fun updateUiForStep() {
         if (step == 1) {
-            binding.tvSubtitle.text = "Enter your email to receive an OTP."
+            binding.tvSubtitle.text = "Enter your Employee ID and email to receive an OTP."
             binding.layoutStep1.visibility = View.VISIBLE
             binding.layoutStep2.visibility = View.GONE
         } else {
@@ -83,15 +85,16 @@ class ForgotPasswordDialogFragment : DialogFragment() {
         binding.btnResetPassword.isEnabled = !isLoading
     }
 
-    private fun sendOtp(email: String) {
+    private fun sendOtp(username: String, email: String) {
         setLoading(true)
         lifecycleScope.launch {
             try {
-                val reqBody = mapOf("email" to email)
+                val reqBody = mapOf("username" to username, "email" to email)
                 val response = RetrofitClient.instance.forgotPassword(reqBody)
                 
                 if (response.isSuccess) {
                     Toast.makeText(requireContext(), "OTP sent to email", Toast.LENGTH_SHORT).show()
+                    storedUsername = username
                     storedEmail = email
                     step = 2
                     updateUiForStep()
@@ -111,9 +114,10 @@ class ForgotPasswordDialogFragment : DialogFragment() {
         lifecycleScope.launch {
             try {
                 val reqBody = mapOf(
+                    "username" to storedUsername,
                     "email" to storedEmail,
                     "otp" to otp,
-                    "new_password" to newPass
+                    "password" to newPass
                 )
                 val response = RetrofitClient.instance.resetPassword(reqBody)
                 

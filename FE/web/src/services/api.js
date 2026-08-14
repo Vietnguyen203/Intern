@@ -85,10 +85,12 @@ export const apiService = {
             apiService.post('/users-service/login', { username, password, deviceId }),
         verifyOtp: (username, otp, deviceId, rememberMe) =>
             apiService.post('/users-service/login/verify-otp', { username, otp, deviceId, rememberMe }),
-        forgotPassword: (email) =>
-            apiService.post('/users-service/forgot-password', { email }),
-        resetPassword: (email, otp, newPassword) =>
-            apiService.put('/users-service/reset-password', { email, otp, password: newPassword }),
+        // Cần cả username (Employee ID) lẫn email vì email không unique trong hệ thống — chỉ email
+        // thì không xác định được chính xác 1 tài khoản (xem UserService.forgotPassword bên BE).
+        forgotPassword: (username, email) =>
+            apiService.post('/users-service/forgot-password', { username, email }),
+        resetPassword: (username, email, otp, newPassword) =>
+            apiService.put('/users-service/reset-password', { username, email, otp, password: newPassword }),
         // Tự đăng ký tài khoản nhân viên (2 bước, xác nhận OTP qua email) — role luôn bị ép WAITER
         // ở phía server dù userRequest có gửi gì đi nữa, xem UserService.verifyRegisterOtp.
         register: (userRequest) =>

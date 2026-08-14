@@ -1,7 +1,9 @@
 package com.vietnl.usersservice.adapter.apis;
 
+import com.vietnl.usersservice.application.requests.ForgotPasswordRequest;
 import com.vietnl.usersservice.application.requests.LoginRequest;
 import com.vietnl.usersservice.application.requests.ResetPasswordRequest;
+import com.vietnl.usersservice.application.requests.ResetPasswordWithOtpRequest;
 import com.vietnl.usersservice.application.requests.UserRequest;
 import com.vietnl.usersservice.application.requests.VerifyLoginOtpRequest;
 import com.vietnl.usersservice.application.responses.LoginResponse;
@@ -168,10 +170,36 @@ public class UserAPI {
                                                 "data", UserResponse.fromEntity(updatedUser)));
         }
 
-        // ===== UPDATE PASSWORD =====
+        // ===== UPDATE PASSWORD (Admin đổi mật khẩu người khác theo id) =====
+        // Trước đây endpoint này không có @PreAuthorize, trong khi cả path /users-service/request/**
+        // đang permitAll() — nghĩa là bất kỳ ai biết UUID của 1 tài khoản đều đổi được mật khẩu tài
+        // khoản đó mà không cần đăng nhập. Khoá lại ADMIN-only, khớp với các endpoint quản trị khác
+        // (getAll/getById/update/delete). Người dùng tự đổi mật khẩu của chính mình khi quên thì dùng
+        // 2 endpoint /forgot-password + /reset-password (xác thực bằng OTP email) bên dưới.
         @PutMapping("/{id}/reset-password")
+        @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<?> resetPassword(@PathVariable String id, @RequestBody ResetPasswordRequest request) {
                 userService.resetPassword(id, request);
+                return ResponseEntity.ok(
+                                Map.of(
+                                                "code", "200",
+                                                "message", "Mật khẩu đã được thiết lập lại thành công"));
+        }
+
+        // ===== QUÊN MẬT KHẨU (public, tự phục vụ — bước 1: gửi OTP về email) =====
+        @PostMapping("/forgot-password")
+        public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+                userService.forgotPassword(request);
+                return ResponseEntity.ok(
+                                Map.of(
+                                                "code", "200",
+                                                "message", "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi tới email đó"));
+        }
+
+        // ===== QUÊN MẬT KHẨU (public, tự phục vụ — bước 2: xác thực OTP + đặt mật khẩu mới) =====
+        @PutMapping("/reset-password")
+        public ResponseEntity<?> resetPasswordWithOtp(@RequestBody ResetPasswordWithOtpRequest request) {
+                userService.resetPasswordWithOtp(request);
                 return ResponseEntity.ok(
                                 Map.of(
                                                 "code", "200",

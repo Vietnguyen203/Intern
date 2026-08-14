@@ -1,7 +1,9 @@
 package com.vietnl.usersservice.application.usecases;
 
 import com.vietnl.usersservice.infrastructure.persistence.repositories.UserRepository;
+import com.vietnl.usersservice.application.requests.ForgotPasswordRequest;
 import com.vietnl.usersservice.application.requests.ResetPasswordRequest;
+import com.vietnl.usersservice.application.requests.ResetPasswordWithOtpRequest;
 import com.vietnl.usersservice.application.requests.UserRequest;
 import com.vietnl.usersservice.application.security.JwtService;
 import com.vietnl.usersservice.application.responses.LoginResponse;
@@ -43,6 +45,13 @@ public class UserService {
     private static final Map<String, UserRequest> pendingRegistrations = new ConcurrentHashMap<>();
     private static final Map<String, String> registerOtpStorage = new ConcurrentHashMap<>();
     private static final Map<String, LocalDateTime> registerOtpExpiryStorage = new ConcurrentHashMap<>();
+
+    // Quên mật khẩu (public, tự phục vụ) — khoá theo USERNAME (Employee ID), giống các map OTP
+    // khác. Trước đây khoá theo email nhưng email không unique trong hệ thống (nhiều tài khoản có
+    // thể chung 1 email) nên không xác định được chính xác 1 tài khoản — bắt người dùng nhập thêm
+    // username ở form Quên mật khẩu để loại bỏ hoàn toàn sự mập mờ này.
+    private static final Map<String, String> forgotOtpStorage = new ConcurrentHashMap<>();
+    private static final Map<String, LocalDateTime> forgotOtpExpiryStorage = new ConcurrentHashMap<>();
 
     public LoginResponse login(String username, String password, String deviceId) {
         User user = userRepository.findByUsername(username)
@@ -295,5 +304,54 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
+    }
+
+    /**
+     * Quên mật khẩu (bước 1, public) — gửi OTP về email nếu username khớp đúng 1 tài khoản VÀ
+     * email của tài khoản đó khớp email nhập vào. Bắt buộc cả 2 (không chỉ email) vì email không
+     * unique trong hệ thống — chỉ dựa email thì không biết chính xác là tài khoản nào.
+     * Cố tình KHÔNG báo lỗi khi không khớp (trả về bình thường như thành công) để tránh lộ thông
+     * tin "username/email nào tồn tại trong hệ thống" cho người ngoài dò quét.
+     */
+    public void forgotPassword(ForgotPasswordRequest request) {
+        userRepository.findByUsername(request.getUsername())
+                .filter(user -> user.getEmail() != null && user.getEmail().equalsIgnoreCase(request.getEmail()))
+                .ifPresent(user -> {
+                    String otp = String.format("%06d", new Random().nextInt(999999));
+                    forgotOtpStorage.put(request.getUsername(), otp);
+                    forgotOtpExpiryStorage.put(request.getUsername(), LocalDateTime.now().plusMinutes(5));
+                    sendOtpEmail(user.getEmail(), otp);
+                });
+    }
+
+    /**
+     * Quên mật khẩu (bước 2, public) — xác thực OTP theo username rồi đổi mật khẩu luôn trong 1
+     * lần gọi (không tách riêng bước "verify" như /register, vì FE cả web lẫn mobile đã viết sẵn
+     * theo hướng gộp 1 request duy nhất).
+     */
+    public void resetPasswordWithOtp(ResetPasswordWithOtpRequest request) {
+        String username = request.getUsername();
+        String storedOtp = forgotOtpStorage.get(username);
+        LocalDateTime expiry = forgotOtpExpiryStorage.get(username);
+
+        if (storedOtp == null || expiry == null || !storedOtp.equals(request.getOtp())) {
+            throw new RuntimeException(ExceptionMessage.OTP_INVALID.getMessage());
+        }
+        if (LocalDateTime.now().isAfter(expiry)) {
+            forgotOtpStorage.remove(username);
+            forgotOtpExpiryStorage.remove(username);
+            throw new RuntimeException(ExceptionMessage.OTP_EXPIRED.getMessage());
+        }
+
+        userValidator.validatePassword(request.getPassword());
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException(ExceptionMessage.USER_NOT_FOUND.getMessage()));
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        forgotOtpStorage.remove(username);
+        forgotOtpExpiryStorage.remove(username);
     }
 }

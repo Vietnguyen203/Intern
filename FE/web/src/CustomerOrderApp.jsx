@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from './services/api';
 import { ShoppingCart, Plus, Minus, X, CheckCircle, Search, ArrowLeft, User, Award, Gift, LogOut, History } from 'lucide-react';
 
@@ -40,6 +40,12 @@ const CustomerOrderApp = () => {
 
   // ===== TÀI KHOẢN KHÁCH HÀNG (tích điểm / hạng thành viên) =====
   const [customer, setCustomer] = useState(null); // null = chưa đăng nhập (vẫn order được bình thường)
+  // entryResolved = false -> hiện màn "cổng vào" toàn màn hình (Đăng nhập/Đăng ký/Khách/Bỏ qua),
+  // CHƯA render thực đơn phía sau. true -> đã chọn xong (đăng nhập/khách/bỏ qua), cho vào xem menu.
+  const [entryResolved, setEntryResolved] = useState(false);
+  // Màn chào ngắn (~1.8s) hiện đúng 1 lần ngay sau khi qua cổng vào, trước khi vào menu thật.
+  const [showWelcome, setShowWelcome] = useState(false);
+  const welcomeShownRef = useRef(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'guest'
   const [authForm, setAuthForm] = useState({ phone: '', password: '', fullName: '', email: '' });
@@ -85,7 +91,9 @@ const CustomerOrderApp = () => {
     // Khôi phục phiên đăng nhập của khách nếu trình duyệt còn lưu token (localStorage riêng
     // với token nhân viên — xem services/api.js). Token hết hạn/không hợp lệ thì âm thầm bỏ qua,
     // không chặn khách xem menu.
+    let hasSavedIdentity = false;
     if (localStorage.getItem('customerToken')) {
+      hasSavedIdentity = true;
       apiService.loyalty.me()
         .then(res => setCustomer(res.data || res))
         .catch(() => localStorage.removeItem('customerToken'));
@@ -99,6 +107,7 @@ const CustomerOrderApp = () => {
         if (parsedGuest?.name && parsedGuest?.expiresAt && Date.now() < parsedGuest.expiresAt) {
           setGuestName(parsedGuest.name);
           setGuestPhone(parsedGuest.phone || '');
+          hasSavedIdentity = true;
         } else {
           localStorage.removeItem(GUEST_STORAGE_KEY);
         }
@@ -106,7 +115,31 @@ const CustomerOrderApp = () => {
     } catch {
       localStorage.removeItem(GUEST_STORAGE_KEY);
     }
+
+    // Đã có tài khoản/khách tạm còn hạn từ trước, hoặc trước đó đã chủ động bấm "Tiếp tục không cần
+    // tài khoản" trong cùng phiên trình duyệt này -> khỏi bắt qua lại màn cổng vào mỗi lần load trang.
+    let skippedBefore = false;
+    try { skippedBefore = sessionStorage.getItem('customerEntrySkipped') === '1'; } catch {}
+    if (hasSavedIdentity || skippedBefore) setEntryResolved(true);
   }, []);
+
+  // Hiện màn chào ngay khi vừa qua cổng vào — chỉ 1 lần cho tới khi rời trang (đổi tài khoản/đăng
+  // xuất giữa chừng không hiện lại, tránh làm phiền khách đang thao tác dở).
+  useEffect(() => {
+    if (entryResolved && !welcomeShownRef.current) {
+      welcomeShownRef.current = true;
+      setShowWelcome(true);
+      const timer = setTimeout(() => setShowWelcome(false), 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [entryResolved]);
+
+  const getWelcomeGreeting = () => {
+    const place = tableName ? `tại Bàn ${tableName}` : '';
+    if (customer) return { title: `Chào mừng, ${customer.fullName || customer.phone}! 👋`, subtitle: `Chúc bạn ngon miệng ${place}`.trim() };
+    if (guestName) return { title: `Chào ${guestName}! 👋`, subtitle: `Chúc bạn ngon miệng ${place}`.trim() };
+    return { title: 'Chào mừng quý khách! 👋', subtitle: `Chúc bạn ngon miệng ${place}`.trim() };
+  };
 
   const handleGuestContinue = () => {
     const name = guestNameInput.trim();
@@ -123,12 +156,22 @@ const CustomerOrderApp = () => {
     setGuestPhoneInput('');
     setAuthError('');
     setShowAuthModal(false);
+    setEntryResolved(true);
   };
 
   const handleClearGuest = () => {
     localStorage.removeItem(GUEST_STORAGE_KEY);
     setGuestName('');
     setGuestPhone('');
+  };
+
+  // "Tiếp tục không cần tài khoản" ở màn cổng vào — cho xem/đặt món ẩn danh như trước giờ, chỉ nhớ
+  // lựa chọn này trong phiên trình duyệt hiện tại để không hỏi lại mỗi lần load lại trang.
+  const handleSkipEntry = () => {
+    try { sessionStorage.setItem('customerEntrySkipped', '1'); } catch {}
+    setEntryResolved(true);
+    setShowAuthModal(false);
+    setAuthError('');
   };
 
   // Đăng nhập: 1 bước như cũ. Đăng ký: bước 1 — validate + gửi OTP, CHƯA có token/tài khoản, phải
@@ -162,6 +205,7 @@ const CustomerOrderApp = () => {
         setCustomer(data.customer || data);
         setShowAuthModal(false);
         setAuthForm({ phone: '', password: '', fullName: '', email: '' });
+        setEntryResolved(true);
       }
     } catch (err) {
       setAuthError(err.message || 'Có lỗi xảy ra, vui lòng thử lại.');
@@ -187,6 +231,7 @@ const CustomerOrderApp = () => {
       setAuthForm({ phone: '', password: '', fullName: '', email: '' });
       setRegisterOtpStep(false);
       setRegisterOtp('');
+      setEntryResolved(true);
     } catch (err) {
       setAuthError(err.message || 'Xác nhận OTP thất bại.');
     } finally {
@@ -230,6 +275,154 @@ const CustomerOrderApp = () => {
       alert('Không đổi được thưởng: ' + err.message);
     }
   };
+
+  // Nội dung 3 tab Đăng nhập / Đăng ký / Khách — dùng chung cho cả màn cổng vào toàn màn hình (chưa
+  // xác định danh tính) lẫn bottom-sheet đổi tài khoản (khi đã vào menu rồi, bấm nút góc trên).
+  const renderAuthTabs = () => (
+    <>
+      <div style={{ display: 'flex', gap: '4px', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '12px', marginBottom: '18px' }}>
+        {[
+          { key: 'login', label: 'Đăng nhập' },
+          { key: 'register', label: 'Đăng ký' },
+          { key: 'guest', label: 'Khách' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => { setAuthMode(tab.key); setAuthError(''); setRegisterOtpStep(false); }}
+            style={{
+              flex: 1, padding: '10px 8px', borderRadius: '9px', border: 'none', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '700',
+              backgroundColor: authMode === tab.key ? '#11117F' : 'transparent',
+              color: authMode === tab.key ? '#FFF' : '#64748B',
+              transition: 'all 0.15s',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {authMode !== 'guest' ? (
+        authMode === 'register' && registerOtpStep ? (
+          // --- ĐĂNG KÝ BƯỚC 2: xác nhận OTP đã gửi về email ---
+          <>
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
+              Mã OTP xác nhận đăng ký đã được gửi về email <strong>{authForm.email}</strong>. Nhập mã để hoàn tất tạo tài khoản.
+            </p>
+            <input
+              type="text" placeholder="______" maxLength={6}
+              value={registerOtp}
+              onChange={e => setRegisterOtp(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: '800', boxSizing: 'border-box' }}
+            />
+
+            {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
+
+            <button
+              onClick={handleRegisterVerifyOtp}
+              disabled={authLoading}
+              style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
+            >
+              {authLoading ? 'Đang xác nhận...' : 'Xác nhận OTP'}
+            </button>
+            <button
+              onClick={() => { setRegisterOtpStep(false); setAuthError(''); }}
+              style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#64748B', fontSize: '14px', cursor: 'pointer' }}
+            >
+              ← Quay lại
+            </button>
+          </>
+        ) : (
+        <>
+          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
+            {authMode === 'register'
+              ? 'Đăng ký để tích điểm và lên hạng thành viên mỗi lần thanh toán — cần xác nhận OTP qua email.'
+              : 'Có tài khoản để tích điểm và lên hạng thành viên mỗi lần thanh toán.'}
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {authMode === 'register' && (
+              <input
+                type="text" placeholder="Họ và tên"
+                value={authForm.fullName}
+                onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+              />
+            )}
+            <input
+              type="tel" placeholder="Số điện thoại"
+              value={authForm.phone}
+              onChange={e => setAuthForm({ ...authForm, phone: e.target.value })}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+            />
+            {authMode === 'register' && (
+              <input
+                type="email" placeholder="Email (để nhận mã OTP)"
+                value={authForm.email}
+                onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+              />
+            )}
+            <input
+              type="password" placeholder="Mật khẩu"
+              value={authForm.password}
+              onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
+
+          <button
+            onClick={handleAuthSubmit}
+            disabled={authLoading}
+            style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
+          >
+            {authLoading ? 'Đang xử lý...' : (authMode === 'login' ? 'Đăng nhập' : 'Đăng ký')}
+          </button>
+        </>
+        )
+      ) : (
+        <>
+          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
+            Dùng tạm để đặt món — chỉ cần tên và số điện thoại, không cần mật khẩu. Không tích điểm hay lên hạng thành viên, và thông tin này sẽ tự xoá khỏi máy sau 24 giờ.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <input
+              type="text" placeholder="Tên của bạn"
+              value={guestNameInput}
+              onChange={e => setGuestNameInput(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+            />
+            <input
+              type="tel" placeholder="Số điện thoại"
+              value={guestPhoneInput}
+              onChange={e => setGuestPhoneInput(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
+
+          <button
+            onClick={handleGuestContinue}
+            style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
+          >
+            Tiếp tục với tên khách
+          </button>
+
+          {guestName && (
+            <button
+              onClick={handleClearGuest}
+              style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              Xoá tài khoản khách hiện tại ({guestName} - {guestPhone})
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
 
   const fetchMenu = async () => {
     try {
@@ -378,6 +571,50 @@ const CustomerOrderApp = () => {
       setLoading(false);
     }
   };
+
+  // Cổng vào toàn màn hình: chưa đăng nhập / chưa chọn Khách / chưa bấm "Tiếp tục không cần tài khoản"
+  // thì dừng ở đây — không render thực đơn phía sau nữa, tránh tình trạng thấy mờ mờ món ăn qua modal.
+  if (!entryResolved) {
+    return (
+      <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '"Inter", sans-serif' }}>
+        <div style={{ backgroundColor: '#11117F', padding: '32px 20px', color: 'white', textAlign: 'center' }}>
+          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>NHÀ HÀNG FOOD</h1>
+          {tableName ? (
+            <p style={{ margin: '8px 0 0 0', opacity: 0.85, fontSize: '14px' }}>Bàn {tableName} — vui lòng chọn cách vào thực đơn</p>
+          ) : (
+            <p style={{ margin: '8px 0 0 0', opacity: 0.85, fontSize: '14px' }}>Chào mừng quý khách</p>
+          )}
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ backgroundColor: '#FFF', width: '100%', maxWidth: '420px', borderRadius: '20px', padding: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', boxSizing: 'border-box' }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: '20px', fontWeight: '800', color: '#1E293B' }}>Tài khoản</h3>
+            {renderAuthTabs()}
+            <button
+              onClick={handleSkipEntry}
+              style={{ width: '100%', marginTop: '4px', padding: '12px', background: 'none', border: 'none', color: '#94A3B8', fontSize: '13px', cursor: 'pointer' }}
+            >
+              Tiếp tục không cần tài khoản
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Màn chào ngắn ngay sau khi qua cổng vào, trước khi hiện menu thật — tự ẩn sau ~1.8s (xem effect ở trên).
+  if (showWelcome) {
+    const greeting = getWelcomeGreeting();
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'linear-gradient(135deg, #11117F 0%, #1E3A8A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', textAlign: 'center', padding: '24px', fontFamily: '"Inter", sans-serif' }}>
+        <style>{`@keyframes welcomeFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+        <div style={{ animation: 'welcomeFadeIn 0.4s ease' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '14px', opacity: 0.8, fontWeight: '700', letterSpacing: '1px' }}>NHÀ HÀNG FOOD</p>
+          <h1 style={{ margin: '0 0 10px', fontSize: '26px', fontWeight: '800' }}>{greeting.title}</h1>
+          <p style={{ margin: 0, fontSize: '15px', opacity: 0.85 }}>{greeting.subtitle}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && foods.length === 0) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Đang tải thực đơn...</div>;
@@ -674,164 +911,17 @@ const CustomerOrderApp = () => {
         </div>
       )}
 
-      {/* Auth Modal — Đăng nhập / Đăng ký / Khách (tạm thời) — tất cả đều tùy chọn, không bắt buộc để order */}
-      {showAuthModal && (
+      {/* Auth Modal — dùng SAU KHI đã vào menu rồi (entryResolved), để khách nâng cấp từ tài khoản
+          khách tạm lên tài khoản thật, hoặc đăng nhập/đăng ký thêm. Màn cổng vào ban đầu nằm riêng
+          ở early-return phía trên, không dùng chung modal này để tránh vừa thấy món ăn vừa thấy form. */}
+      {entryResolved && showAuthModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end' }}>
           <div style={{ backgroundColor: '#FFF', width: '100%', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px', paddingBottom: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#1E293B' }}>Tài khoản</h3>
               <button onClick={() => { setShowAuthModal(false); setAuthError(''); }} style={{ background: 'transparent', border: 'none', color: '#64748B' }}><X size={24} /></button>
             </div>
-
-            {/* Sign In / Sign Up / Guest */}
-            <div style={{ display: 'flex', gap: '4px', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '12px', marginBottom: '18px' }}>
-              {[
-                { key: 'login', label: 'Đăng nhập' },
-                { key: 'register', label: 'Đăng ký' },
-                { key: 'guest', label: 'Khách' },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => { setAuthMode(tab.key); setAuthError(''); setRegisterOtpStep(false); }}
-                  style={{
-                    flex: 1, padding: '10px 8px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-                    fontSize: '13px', fontWeight: '700',
-                    backgroundColor: authMode === tab.key ? '#11117F' : 'transparent',
-                    color: authMode === tab.key ? '#FFF' : '#64748B',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {authMode !== 'guest' ? (
-              authMode === 'register' && registerOtpStep ? (
-                // --- ĐĂNG KÝ BƯỚC 2: xác nhận OTP đã gửi về email ---
-                <>
-                  <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
-                    Mã OTP xác nhận đăng ký đã được gửi về email <strong>{authForm.email}</strong>. Nhập mã để hoàn tất tạo tài khoản.
-                  </p>
-                  <input
-                    type="text" placeholder="______" maxLength={6}
-                    value={registerOtp}
-                    onChange={e => setRegisterOtp(e.target.value)}
-                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: '800', boxSizing: 'border-box' }}
-                  />
-
-                  {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
-
-                  <button
-                    onClick={handleRegisterVerifyOtp}
-                    disabled={authLoading}
-                    style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
-                  >
-                    {authLoading ? 'Đang xác nhận...' : 'Xác nhận OTP'}
-                  </button>
-                  <button
-                    onClick={() => { setRegisterOtpStep(false); setAuthError(''); }}
-                    style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#64748B', fontSize: '14px', cursor: 'pointer' }}
-                  >
-                    ← Quay lại
-                  </button>
-                </>
-              ) : (
-              <>
-                <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
-                  {authMode === 'register'
-                    ? 'Đăng ký để tích điểm và lên hạng thành viên mỗi lần thanh toán — cần xác nhận OTP qua email.'
-                    : 'Có tài khoản để tích điểm và lên hạng thành viên mỗi lần thanh toán — không bắt buộc, bạn vẫn order được như bình thường nếu bỏ qua.'}
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {authMode === 'register' && (
-                    <input
-                      type="text" placeholder="Họ và tên"
-                      value={authForm.fullName}
-                      onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
-                      style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                    />
-                  )}
-                  <input
-                    type="tel" placeholder="Số điện thoại"
-                    value={authForm.phone}
-                    onChange={e => setAuthForm({ ...authForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                  />
-                  {authMode === 'register' && (
-                    <input
-                      type="email" placeholder="Email (để nhận mã OTP)"
-                      value={authForm.email}
-                      onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
-                      style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                    />
-                  )}
-                  <input
-                    type="password" placeholder="Mật khẩu"
-                    value={authForm.password}
-                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
-
-                <button
-                  onClick={handleAuthSubmit}
-                  disabled={authLoading}
-                  style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
-                >
-                  {authLoading ? 'Đang xử lý...' : (authMode === 'login' ? 'Đăng nhập' : 'Đăng ký')}
-                </button>
-              </>
-              )
-            ) : (
-              <>
-                <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B' }}>
-                  Dùng tạm để đặt món — chỉ cần tên và số điện thoại, không cần mật khẩu. Không tích điểm hay lên hạng thành viên, và thông tin này sẽ tự xoá khỏi máy sau 24 giờ.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <input
-                    type="text" placeholder="Tên của bạn"
-                    value={guestNameInput}
-                    onChange={e => setGuestNameInput(e.target.value)}
-                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                  />
-                  <input
-                    type="tel" placeholder="Số điện thoại"
-                    value={guestPhoneInput}
-                    onChange={e => setGuestPhoneInput(e.target.value)}
-                    style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                {authError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '12px' }}>{authError}</p>}
-
-                <button
-                  onClick={handleGuestContinue}
-                  style={{ width: '100%', marginTop: '20px', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700' }}
-                >
-                  Tiếp tục với tên khách
-                </button>
-
-                {guestName && (
-                  <button
-                    onClick={handleClearGuest}
-                    style={{ width: '100%', marginTop: '10px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                  >
-                    Xoá tài khoản khách hiện tại ({guestName} - {guestPhone})
-                  </button>
-                )}
-              </>
-            )}
-
-            <button
-              onClick={() => { setShowAuthModal(false); setAuthError(''); }}
-              style={{ width: '100%', marginTop: '4px', padding: '12px', background: 'none', border: 'none', color: '#94A3B8', fontSize: '13px', cursor: 'pointer' }}
-            >
-              Tiếp tục không cần tài khoản
-            </button>
+            {renderAuthTabs()}
           </div>
         </div>
       )}
