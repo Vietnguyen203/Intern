@@ -25,7 +25,7 @@ import { ToastContainer } from './shared/components/ToastContainer';
 import { WelcomeSplash } from './shared/components/WelcomeSplash';
 import { QRCodeModal } from './shared/components/QRCodeModal';
 import { LoginScreen } from './features/auth/LoginScreen';
-import { KDS_SETTINGS_DEFAULT } from './features/dashboard/kitchen/kitchenUtils';
+import { KDS_SETTINGS_DEFAULT, printKitchenTicket } from './features/dashboard/kitchen/kitchenUtils';
 import { useKitchen } from './features/dashboard/kitchen/useKitchen';
 import { KitchenTab } from './features/dashboard/kitchen/KitchenTab';
 
@@ -610,10 +610,21 @@ const DashboardScreen = ({ user, onLogout }) => {
     kitchenCategoryOptions,
     kitchenViewMode, setKitchenViewMode,
     kitchenCategoryFilter, setKitchenCategoryFilter,
-    kdsKioskMode, enterKitchenKiosk, exitKitchenKiosk,
     loading: kitchenLoading, timeTicker, kdsCookStartRef,
     fetchKitchenData, handleUpdateItemStatus, handleCompleteAllItems,
   } = useKitchen({ toast, tables, foods, categories, kdsSettings });
+
+  // Chế độ Kiosk giờ mở ở 1 tab/cửa sổ riêng (KitchenKioskPage) chạy dữ liệu thật, thay vì
+  // overlay giả lập trong cùng tab như trước — để có thể kéo sang màn hình/TV gắn cố định
+  // trong bếp mà không chiếm tab quản lý đang thao tác.
+  // LƯU Ý: KHÔNG được thêm 'noopener'/'noreferrer' vào window.open ở đây — nếu người đăng
+  // nhập không tick "Ghi nhớ đăng nhập" thì token chỉ nằm trong sessionStorage (xem
+  // LoginScreen.jsx), và trình duyệt chỉ tự sao chép sessionStorage sang tab mới khi tab đó
+  // vẫn thuộc cùng "nhóm ngữ cảnh duyệt web" với tab mở nó — noopener/noreferrer phá vỡ điều
+  // này, khiến tab Kiosk mở ra báo "Chưa đăng nhập" dù tab chính vẫn đang đăng nhập bình
+  // thường. Vì đây là URL nội bộ cùng origin (không phải link ngoài/không tin cậy) nên bỏ
+  // noopener không có rủi ro reverse-tabnabbing thực sự.
+  const openKitchenKiosk = () => window.open('/kitchen-kiosk', '_blank');
 
   // Waiter xác nhận đã mang món ra bàn (READY -> SERVED) — thao tác này nằm ở tab Orders vì
   // WAITER không có quyền vào tab Kitchen, và về nghiệp vụ đây đúng là việc của phục vụ chứ không phải bếp.
@@ -698,6 +709,15 @@ const DashboardScreen = ({ user, onLogout }) => {
     if (!ok) return;
     try {
       await apiService.order.cancel(orderId);
+      // ✅ Tự động hoàn kho toàn bộ nguyên liệu đã trừ cho các món trong đơn vừa huỷ (best-effort —
+      // đơn đã huỷ thành công rồi nên không chặn luồng nếu bước hoàn kho lỗi).
+      const cancelledOrder = allOrders.find(o => String(o.id) === String(orderId));
+      const refundItems = (cancelledOrder?.items || [])
+        .filter(it => it.menuItemId && it.quantity > 0)
+        .map(it => ({ menuItemId: it.menuItemId, quantity: it.quantity }));
+      if (refundItems.length > 0) {
+        try { await apiService.catalog.refundStock(refundItems); } catch (_) { /* best-effort */ }
+      }
       toast.success('Đã hủy đơn hàng');
       fetchOrdersData();
     } catch (e) { toast.error('Lỗi hủy đơn: ' + e.message); }
@@ -728,7 +748,11 @@ const DashboardScreen = ({ user, onLogout }) => {
   }, [selectedTableForOrders?.id, allOrders.length]);
 
 
-  const handleRemoveItemFromOrder = async (orderId, itemId, itemName, kitchenStatus) => {
+  // Nhận cả object item (không chỉ itemId) để có menuItemId + quantity dùng cho hoàn kho.
+  const handleRemoveItemFromOrder = async (orderId, item) => {
+    const itemId = item.id;
+    const itemName = item.foodName;
+    const kitchenStatus = item.kitchenStatus;
     if (kitchenStatus && kitchenStatus !== 'PENDING') {
       toast.warning(`Không thể xóa "${itemName}" vì bếp đã nhận (${kitchenStatus}).`);
       return;
@@ -737,9 +761,44 @@ const DashboardScreen = ({ user, onLogout }) => {
     if (!ok) return;
     try {
       await apiService.order.removeItem(orderId, itemId);
+      // ✅ Tự động hoàn kho phần nguyên liệu đã trừ cho món vừa xoá khỏi đơn (best-effort — xoá món
+      // đã thành công rồi nên không chặn luồng nếu bước hoàn kho lỗi).
+      if (item.menuItemId && item.quantity > 0) {
+        try { await apiService.catalog.refundStock([{ menuItemId: item.menuItemId, quantity: item.quantity }]); } catch (_) { /* best-effort */ }
+      }
       toast.success(`Đã xóa "${itemName}" khỏi hóa đơn`);
       fetchOrdersData();
     } catch (e) { toast.error('Lỗi xóa món: ' + e.message); }
+  };
+
+  // ✅ Xác nhận đặt món: PENDING -> CONFIRMED, đồng thời đẩy TẤT CẢ món trong đơn sang COOKING ngay
+  // lập tức — bếp có đơn mới và bắt đầu nấu luôn, không cần bếp thao tác nhận thủ công từng món.
+  // Lưu ý về kho: nguyên liệu đã được validate + trừ ngay từ lúc THÊM từng món vào đơn (xem
+  // handleSubmitOrder / apiService.catalog.deductStock) — món không đủ nguyên liệu sẽ không bao giờ
+  // vào được đơn để tới đây, nên bước xác nhận này KHÔNG cần trừ/validate kho lại lần nữa.
+  const handleConfirmOrder = async (order) => {
+    try {
+      await apiService.order.updateStatus(order.id, 'CONFIRMED');
+      const items = order.items || [];
+      await Promise.all(
+        items
+          .filter(it => it.id)
+          .map(it =>
+            apiService.kitchen.updateItemStatus(it.id, 'COOKING')
+              // ✅ Món này vừa chính thức "vào bếp" (chuyển COOKING) — in phiếu ngay lúc này nếu
+              // bật "Tự in khi vào bếp" trong Settings, cùng 1 cài đặt với useKitchen.js dùng cho
+              // nhánh tự động theo giờ + bếp bấm tay, để hành vi nhất quán ở mọi đường vào COOKING.
+              .then(() => {
+                if (kdsSettings.autoPrintOnCooking) {
+                  printKitchenTicket({ ...it, tableNumber: order.tableNumber, orderId: order.id });
+                }
+              })
+              .catch(() => { /* best-effort từng món */ })
+          )
+      );
+      toast.success('✅ Đã xác nhận đặt món — bếp bắt đầu nấu');
+      fetchOrdersData();
+    } catch (e) { toast.error('Lỗi xác nhận đơn: ' + e.message); }
   };
 
   const handleUpdateOrderStatus = async (orderId, status) => {
@@ -827,6 +886,20 @@ const DashboardScreen = ({ user, onLogout }) => {
       return;
     }
 
+    // ✅ Trừ kho NGAY khi gửi đơn (thêm món vào đơn) — validate đủ nguyên liệu cho ĐỦ số lượng của
+    // TỪNG món trong giỏ ngay lúc này, chặn luôn nếu kho không đủ (BE trả lỗi rõ tên nguyên liệu/số
+    // lượng thiếu, VD: gọi 5 suất nhưng kho chỉ đủ 3) — tránh nhận đơn số lượng lớn mà kho không đáp ứng nổi.
+    const deductItems = cartItems.map(item => ({ menuItemId: item.menuItemId, quantity: item.quantity }));
+    try {
+      await apiService.catalog.deductStock(deductItems);
+    } catch (e) {
+      toast.error('Không đủ nguyên liệu trong kho: ' + e.message);
+      return;
+    }
+
+    // Từ đây kho đã bị trừ — nếu bước thêm món/tạo đơn bên dưới thất bại giữa chừng thì phải hoàn
+    // lại phần vừa trừ (finally), tránh lệch số liệu kho cho món chưa thực sự vào đơn nào.
+    let deductedPendingCompensation = true;
     try {
       const selectedTable = tables.find(t => String(t.id) === String(selectedTableId));
 
@@ -857,6 +930,8 @@ const DashboardScreen = ({ user, onLogout }) => {
         toast.success('🎉 Đã tạo đơn hàng thành công!');
       }
 
+      deductedPendingCompensation = false;
+
       // Cleanup & Refresh
       setIsCreateOrderModalOpen(false);
       setCartItems([]);
@@ -865,6 +940,10 @@ const DashboardScreen = ({ user, onLogout }) => {
       fetchOrdersData();
     } catch (err) {
       toast.error('Lỗi khi tạo đơn hàng: ' + err.message);
+    } finally {
+      if (deductedPendingCompensation) {
+        try { await apiService.catalog.refundStock(deductItems); } catch (_) { /* best-effort */ }
+      }
     }
   };
 
@@ -1984,7 +2063,6 @@ const DashboardScreen = ({ user, onLogout }) => {
           {/* KITCHEN TAB + KDS KIOSK — UI đã chuyển sang features/dashboard/kitchen/KitchenTab.jsx (Bước 1) */}
           <KitchenTab
             active={activeTab === 'Kitchen'}
-            kioskMode={kdsKioskMode}
             kitchenItems={kitchenItems}
             visibleKitchenItems={visibleKitchenItems}
             kitchenCategoryOptions={kitchenCategoryOptions}
@@ -1999,8 +2077,7 @@ const DashboardScreen = ({ user, onLogout }) => {
             onStatusChange={handleUpdateItemStatus}
             onCompleteAll={handleCompleteAllItems}
             onRefresh={fetchKitchenData}
-            onEnterKiosk={enterKitchenKiosk}
-            onExitKiosk={exitKitchenKiosk}
+            onEnterKiosk={openKitchenKiosk}
             canProposeFood={user?.role === 'KITCHEN'}
             onProposeFood={handleOpenProposeFoodModal}
           />
@@ -2139,9 +2216,24 @@ const DashboardScreen = ({ user, onLogout }) => {
                           }
                           return tableOrders.map(order => (
                             <div key={order.id} style={{ borderBottom: '1px dashed #E2E8F0', paddingBottom: '16px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
                                 <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)', fontFamily: 'monospace' }}>#{String(order.id).slice(0, 6)}</span>
-                                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', backgroundColor: `${getStatusColor(order.status)}15`, color: getStatusColor(order.status) }}>{order.status}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', backgroundColor: `${getStatusColor(order.status)}15`, color: getStatusColor(order.status) }}>{order.status}</span>
+                                  {order.status === 'PENDING' && (
+                                    <button
+                                      onClick={() => handleConfirmOrder(order)}
+                                      title="Xác nhận đặt món — gửi xuống bếp và bắt đầu nấu"
+                                      style={{
+                                        background: '#10B981', border: 'none', borderRadius: '8px',
+                                        padding: '4px 10px', fontSize: '11px', fontWeight: '800',
+                                        color: '#FFF', cursor: 'pointer', whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      ✅ Xác nhận
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {(order.items || []).map((item, idx) => {
@@ -2159,7 +2251,7 @@ const DashboardScreen = ({ user, onLogout }) => {
                                       </span>
                                       <span style={{ fontWeight: '600', whiteSpace: 'nowrap' }}>{(item.unitPrice * item.quantity).toLocaleString('vi-VN')}đ</span>
                                       <button
-                                        onClick={() => handleRemoveItemFromOrder(order.id, item.id, item.foodName, item.kitchenStatus)}
+                                        onClick={() => handleRemoveItemFromOrder(order.id, item)}
                                         title={canDelete ? 'Xóa món này' : `Không thể xóa — bếp đang ${item.kitchenStatus}`}
                                         style={{
                                           background: canDelete ? '#FEE2E2' : '#F1F5F9',
@@ -3258,9 +3350,9 @@ const DashboardScreen = ({ user, onLogout }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                       <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: kdsSettings.autoPrintOnCooking ? 'rgba(99,102,241,0.15)' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>🖨️</div>
                       <div>
-                        <p style={{ margin: 0, fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)' }}>Tự in phiếu khi tự động chuyển "Đang nấu"</p>
+                        <p style={{ margin: 0, fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)' }}>Tự in phiếu khi món vào bếp ("Đang nấu")</p>
                         <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                          {kdsSettings.autoPrintOnCooking ? 'Đang bật — chỉ áp dụng khi "Tự chuyển Chờ → Đang nấu" ở trên > 0' : 'Đang tắt'}. Chưa có máy in thật nên sẽ tải về 1 ảnh mô phỏng tờ phiếu.
+                          {kdsSettings.autoPrintOnCooking ? 'Đang bật — áp dụng cho mọi cách món chuyển "Đang nấu": xác nhận đặt món, bếp bấm tay, hoặc tự động theo giờ ở trên' : 'Đang tắt'}. Chưa có máy in thật nên sẽ tải về 1 ảnh mô phỏng tờ phiếu.
                         </p>
                       </div>
                     </div>

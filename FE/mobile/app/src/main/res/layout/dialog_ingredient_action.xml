@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog chọn hành động cho 1 nguyên liệu — inflate thủ công (KHÔNG ViewBinding) trong
+     InventoryFragment.showIngredientActionDialog(). Không đổi id nào findViewById đang dùng:
+     tvIngredientName, btnImport, btnExport, btnEdit, btnCancel. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
+    android:padding="@dimen/spacing_lg"
     android:background="@drawable/bg_bottom_sheet">
 
     <TextView
@@ -11,44 +15,50 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Thịt bò"
-        android:textColor="#0F172A"
+        android:fontFamily="@font/kanit_bold"
+        android:textColor="@color/text_primary"
         android:textSize="20sp"
-        android:textStyle="bold"
         android:gravity="center"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="@dimen/spacing_lg" />
 
     <Button
         android:id="@+id/btnImport"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Nhập kho"
-        android:backgroundTint="#10B981"
+        android:fontFamily="@font/kanit_medium"
+        android:backgroundTint="@color/accent_ready"
         android:textColor="@color/white"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="@dimen/spacing_sm" />
 
     <Button
         android:id="@+id/btnExport"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Xuất kho"
-        android:backgroundTint="#F59E0B"
+        android:fontFamily="@font/kanit_medium"
+        android:backgroundTint="@color/accent_pending"
         android:textColor="@color/white"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="@dimen/spacing_sm" />
 
     <Button
         android:id="@+id/btnEdit"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Chỉnh sửa thông tin"
+        android:fontFamily="@font/kanit_medium"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_marginBottom="12dp" />
+        android:textColor="@color/primary"
+        app:strokeColor="@color/primary"
+        android:layout_marginBottom="@dimen/spacing_sm" />
 
     <Button
         android:id="@+id/btnCancel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Hủy"
+        android:fontFamily="@font/kanit_medium"
         style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:textColor="#64748B" />
+        android:textColor="@color/text_secondary" />
 
 </LinearLayout>

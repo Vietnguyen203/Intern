@@ -102,6 +102,7 @@ class DashboardFragment : Fragment() {
                         "ORDER"            -> safeNavigate(R.id.navigation_order_table)
                         "KITCHEN"          -> safeNavigate(R.id.navigation_kitchen)
                         "INVENTORY"        -> safeNavigate(R.id.navigation_inventory)
+                        "PROFILE"          -> safeNavigate(R.id.navigation_profile)
                         "LOGOUT"           -> safeNavigate(R.id.navigation_logout_dialog)
                     }
                 }.show(fm, tag)

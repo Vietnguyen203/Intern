@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Nền badge loại giao dịch (Nhập kho/Xuất bán/Xuất hủy) trong item_transaction.xml.
+     TransactionAdapter.kt chỉ setTextColor theo loại giao dịch (xanh/tím/đỏ), KHÔNG setBackgroundColor,
+     nên nền badge là cố định — trước đây luôn là xanh nhạt (#1A10B981) dù chữ có thể tím/đỏ, gây lệch
+     màu. Đổi sang nền pill trung tính (chip_neutral_bg) từ design token để khớp với mọi màu chữ. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#1A10B981" />
-    <corners android:radius="16dp" />
+    <solid android:color="@color/chip_neutral_bg" />
+    <corners android:radius="@dimen/radius_pill" />
 </shape>

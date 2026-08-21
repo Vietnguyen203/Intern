@@ -1,26 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Card nhân viên trong danh sách — nâng cấp theo design system (card bo góc lớn, đổ bóng nhẹ,
+     vai trò hiển thị dạng badge pill). Không đổi id nào StaffAdapter.kt đang dùng:
+     tvName, tvEmployeeId, tvCreateAt, tvRole, tvBirthday, tvCreateBy. -->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="10dp"
-    app:cardBackgroundColor="@color/white"
-    app:cardCornerRadius="10dp"
-    app:cardElevation="10dp">
+    android:layout_marginHorizontal="@dimen/spacing_md"
+    android:layout_marginVertical="@dimen/spacing_xs"
+    app:cardBackgroundColor="@color/bg_surface"
+    app:cardCornerRadius="@dimen/radius_lg"
+    app:cardElevation="@dimen/elevation_sm">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="10dp">
+        android:padding="@dimen/spacing_md">
 
         <androidx.cardview.widget.CardView
             android:id="@+id/cardViewAvatar"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_margin="20dp"
-            app:cardBackgroundColor="@color/white"
-            app:cardCornerRadius="80dp"
-            app:cardElevation="4dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            app:cardBackgroundColor="@color/bg_app"
+            app:cardCornerRadius="@dimen/radius_pill"
+            app:cardElevation="0dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -35,89 +38,102 @@
             android:id="@+id/tvName"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="@dimen/spacing_md"
             android:ellipsize="end"
-            android:fontFamily="@font/kanit_regular"
+            android:fontFamily="@font/kanit_bold"
             android:maxLines="1"
             android:singleLine="true"
             android:text="Nguyen Van A"
-            android:textColor="@color/black"
-            android:textSize="18sp"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
             app:layout_constraintTop_toTopOf="@id/cardViewAvatar" />
+
+        <!-- Vai trò dạng badge pill, mirror role chip bên Web Staff tab -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvRole"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_md"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_chip_neutral"
+            android:ellipsize="end"
+            android:fontFamily="@font/kanit_medium"
+            android:maxLines="1"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
+            android:singleLine="true"
+            android:text="Role: WAITER"
+            android:textColor="@color/chip_neutral_text"
+            android:textSize="11sp"
+            app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
+            app:layout_constraintTop_toBottomOf="@id/tvName" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/tvEmployeeId"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="@dimen/spacing_md"
+            android:layout_marginTop="6dp"
             android:ellipsize="end"
-            android:fontFamily="@font/kanit_light"
+            android:fontFamily="@font/kanit_regular"
             android:maxLines="1"
             android:singleLine="true"
             android:text="EmployeeID: ngyuneva1"
-            android:textSize="14sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
-            app:layout_constraintTop_toBottomOf="@id/tvName" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/tvCreateAt"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/kanit_light"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:text="Create At: 2026.01.07 16:30"
-            android:textSize="14sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
-            app:layout_constraintTop_toBottomOf="@id/tvEmployeeId" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/tvRole"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/kanit_light"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:text="Role: WAITER"
-            android:textSize="14sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
-            app:layout_constraintTop_toBottomOf="@id/tvCreateAt" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/tvBirthday"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/kanit_light"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:text="Birthday: 2000-01-01"
-            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
             app:layout_constraintTop_toBottomOf="@id/tvRole" />
 
         <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvCreateAt"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_md"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/kanit_light"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="Create At: 2026.01.07 16:30"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
+            app:layout_constraintTop_toBottomOf="@id/tvEmployeeId" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvBirthday"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_md"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/kanit_light"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="Birthday: 2000-01-01"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
+            app:layout_constraintTop_toBottomOf="@id/tvCreateAt" />
+
+        <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/tvCreateBy"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="@dimen/spacing_md"
+            android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:fontFamily="@font/kanit_light"
             android:maxLines="1"
             android:singleLine="true"
             android:text="Create by: admin"
-            android:textSize="14sp"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/cardViewAvatar"
             app:layout_constraintTop_toBottomOf="@id/tvBirthday" />

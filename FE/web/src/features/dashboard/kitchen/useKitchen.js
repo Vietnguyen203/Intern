@@ -13,11 +13,12 @@ import { printKitchenTicket } from './kitchenUtils';
 export const useKitchen = ({ toast, tables, foods, categories, kdsSettings }) => {
   const [kitchenItems, setKitchenItems] = useState([]);
 
-  // --- KDS: chế độ xem, lọc theo khu bếp, chế độ Kiosk toàn màn hình ---
+  // --- KDS: chế độ xem, lọc theo khu bếp ---
+  // Chế độ Kiosk toàn màn hình KHÔNG còn là overlay trong cùng tab nữa — giờ mở ở tab/cửa sổ
+  // riêng (xem KitchenKioskPage.jsx), để có thể kéo sang màn hình/TV gắn cố định trong bếp mà
+  // không chiếm tab đang thao tác. Nút "Chế độ Kiosk" ở App.jsx giờ chỉ window.open() trang đó.
   const [kitchenViewMode, setKitchenViewMode] = useState('table'); // 'table' | 'status'
   const [kitchenCategoryFilter, setKitchenCategoryFilter] = useState('ALL');
-  const [kdsKioskMode, setKdsKioskMode] = useState(false);
-  const kdsWakeLockRef = useRef(null);
   const [loading, setLoading] = useState(false);
 
   // State để cưỡng bức re-render các hiển thị phụ thuộc thời gian (thời gian chờ trên vé bếp).
@@ -55,27 +56,6 @@ export const useKitchen = ({ toast, tables, foods, categories, kdsSettings }) =>
     if (kitchenCategoryFilter === 'ALL') return kitchenItemsWithCategory;
     return kitchenItemsWithCategory.filter(i => i.stationName === kitchenCategoryFilter);
   }, [kitchenItemsWithCategory, kitchenCategoryFilter]);
-
-  // Bật/tắt chế độ Kiosk: toàn màn hình + giữ màn hình tablet không tắt (Wake Lock).
-  const enterKitchenKiosk = async () => {
-    setKdsKioskMode(true);
-    try {
-      if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
-    } catch (e) { console.warn('Không thể bật toàn màn hình:', e); }
-    try {
-      if ('wakeLock' in navigator) kdsWakeLockRef.current = await navigator.wakeLock.request('screen');
-    } catch (e) { console.warn('Không thể giữ màn hình sáng (Wake Lock):', e); }
-  };
-  const exitKitchenKiosk = () => {
-    setKdsKioskMode(false);
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    if (kdsWakeLockRef.current) { kdsWakeLockRef.current.release().catch(() => {}); kdsWakeLockRef.current = null; }
-  };
-  useEffect(() => {
-    const handleFsChange = () => { if (!document.fullscreenElement) setKdsKioskMode(false); };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
 
   const fetchKitchenData = async () => {
     setLoading(true);
@@ -119,6 +99,13 @@ export const useKitchen = ({ toast, tables, foods, categories, kdsSettings }) =>
       await apiService.kitchen.updateItemStatus(itemId, newStatus);
       const labels = { COOKING: 'đang nấu', READY: 'sẵn sàng', SERVED: 'đã phục vụ' };
       toast.success(`Cập nhật món → ${labels[newStatus] || newStatus}`);
+      // Bếp bấm tay chuyển món sang "Đang nấu" cũng là 1 cách món "vào bếp" giống hệt việc tự
+      // động chuyển theo giờ ở dưới — nên phải tôn trọng cùng 1 cài đặt "Tự in khi vào bếp"
+      // (autoPrintOnCooking), không chỉ áp dụng riêng cho nhánh tự động theo thời gian.
+      if (newStatus === 'COOKING' && kdsSettings.autoPrintOnCooking) {
+        const item = kitchenItemsWithCategory.find(i => i.id === itemId);
+        if (item) printKitchenTicket(item);
+      }
       fetchKitchenData();
     } catch (error) { toast.error('Lỗi cập nhật: ' + error.message); }
   };
@@ -194,7 +181,6 @@ export const useKitchen = ({ toast, tables, foods, categories, kdsSettings }) =>
     kitchenCategoryOptions,
     kitchenViewMode, setKitchenViewMode,
     kitchenCategoryFilter, setKitchenCategoryFilter,
-    kdsKioskMode, enterKitchenKiosk, exitKitchenKiosk,
     loading, timeTicker, kdsCookStartRef,
     fetchKitchenData, handleUpdateItemStatus, handleCompleteAllItems,
   };

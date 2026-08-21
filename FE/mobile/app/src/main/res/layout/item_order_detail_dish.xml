@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dòng chi tiết 1 món ăn trong đơn — inflate động vào layoutItems của item_order_statistic.xml
+     (xem OrderStatisticAdapter.kt). Nâng cấp theo design system chung: font Kanit, màu token
+     thay hex cứng, không đổi id/cấu trúc để không phá findViewById trong Adapter. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:paddingVertical="6dp"
-    android:paddingHorizontal="16dp"
+    android:paddingVertical="@dimen/spacing_xs"
+    android:paddingHorizontal="@dimen/spacing_md"
     android:gravity="center_vertical">
 
     <TextView
@@ -12,27 +15,28 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
+        android:fontFamily="@font/kanit_medium"
         android:text="Món ăn"
-        android:textColor="#1E293B"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:textColor="@color/text_primary"
+        android:textSize="14sp" />
 
     <TextView
         android:id="@+id/tvDishQty"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="@dimen/spacing_sm"
+        android:fontFamily="@font/kanit_regular"
         android:text="x2"
-        android:textColor="#475569"
+        android:textColor="@color/text_secondary"
         android:textSize="14sp" />
 
     <TextView
         android:id="@+id/tvDishPrice"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="@dimen/spacing_md"
+        android:fontFamily="@font/kanit_bold"
         android:text="50.000 ₫"
-        android:textColor="#0F172A"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:textColor="@color/text_primary"
+        android:textSize="14sp" />
 </LinearLayout>

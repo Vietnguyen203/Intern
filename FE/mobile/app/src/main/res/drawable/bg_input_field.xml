@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Input field chuẩn hoá — viền đậm hơn khi focus, mirror .form-input:focus bên Web.
+     Dùng thay bg_input_common_border_10 cho các form mới nâng cấp (form cũ vẫn giữ nguyên,
+     không bắt buộc đổi để tránh rủi ro). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape>
+            <solid android:color="@color/bg_surface" />
+            <corners android:radius="@dimen/radius_md" />
+            <stroke
+                android:width="1.5dp"
+                android:color="@color/primary" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <solid android:color="@color/bg_surface" />
+            <corners android:radius="@dimen/radius_md" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/border_color" />
+        </shape>
+    </item>
+</selector>

@@ -1,57 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog thêm nguyên liệu mới — inflate thủ công (KHÔNG ViewBinding) trong
+     InventoryFragment.showAddIngredientDialog(). Không đổi id nào findViewById đang dùng:
+     etName, etUnit, etMinStock, btnCancel, btnSave. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="@color/white">
+    android:padding="@dimen/spacing_lg"
+    android:background="@drawable/bg_bottom_sheet">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Thêm Nguyên Liệu"
-        android:textColor="#0F172A"
+        android:fontFamily="@font/kanit_bold"
+        android:textColor="@color/text_primary"
         android:textSize="20sp"
-        android:textStyle="bold"
         android:gravity="center"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="@dimen/spacing_lg" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="@dimen/spacing_md"
+        app:boxStrokeColor="@color/primary"
+        app:hintTextColor="@color/primary"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_regular"
+            android:textColor="@color/text_primary"
             android:hint="Tên nguyên liệu" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="@dimen/spacing_md"
+        app:boxStrokeColor="@color/primary"
+        app:hintTextColor="@color/primary"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etUnit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_regular"
+            android:textColor="@color/text_primary"
             android:hint="Đơn vị tính (VD: kg, hộp...)" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="@dimen/spacing_lg"
+        app:boxStrokeColor="@color/primary"
+        app:hintTextColor="@color/primary"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etMinStock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_regular"
+            android:textColor="@color/text_primary"
             android:inputType="numberDecimal"
             android:hint="Ngưỡng an toàn tối thiểu" />
     </com.google.android.material.textfield.TextInputLayout>
@@ -67,16 +83,18 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Hủy"
+            android:fontFamily="@font/kanit_medium"
             style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:textColor="#64748B"
-            android:layout_marginEnd="16dp" />
+            android:textColor="@color/text_secondary"
+            android:layout_marginEnd="@dimen/spacing_md" />
 
         <Button
             android:id="@+id/btnSave"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Lưu"
-            android:backgroundTint="#11117F"
+            android:fontFamily="@font/kanit_medium"
+            android:backgroundTint="@color/primary"
             android:textColor="@color/white" />
     </LinearLayout>
 

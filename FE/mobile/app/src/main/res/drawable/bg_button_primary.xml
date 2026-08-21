@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nút hành động chính (navy) có hiệu ứng ripple khi bấm — thay cho CardView bọc TextView
+     dùng rải rác trước đây (không có phản hồi chạm). state_pressed đổi màu đậm hơn cho thiết bị
+     API thấp không hỗ trợ ripple mượt. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <selector>
+            <item android:state_enabled="false">
+                <shape>
+                    <solid android:color="@color/text_muted" />
+                    <corners android:radius="@dimen/radius_md" />
+                </shape>
+            </item>
+            <item android:state_pressed="true">
+                <shape>
+                    <solid android:color="@color/primary_hover" />
+                    <corners android:radius="@dimen/radius_md" />
+                </shape>
+            </item>
+            <item>
+                <shape>
+                    <solid android:color="@color/primary" />
+                    <corners android:radius="@dimen/radius_md" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>

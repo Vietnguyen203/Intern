@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Màn chọn món (Order Food) — nâng cấp theo design system chung. Không đổi id nào
+     OrderFoodFragment.kt đang dùng: cardViewBack, etSearch, tabLayout, recyclerView, btnDone,
+     ivEmpty, loadingView. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="@color/bg_app"
     tools:context=".ui.dashboard.DashboardFragment">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardViewBack"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="20dp"
-        app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="50dp"
-        app:cardElevation="10dp"
+        android:layout_marginStart="@dimen/spacing_md"
+        android:layout_marginTop="@dimen/spacing_lg"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:cardCornerRadius="@dimen/radius_pill"
+        app:cardElevation="@dimen/elevation_sm"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
@@ -24,19 +27,19 @@
             android:layout_height="match_parent"
             android:padding="13dp"
             app:srcCompat="@drawable/baseline_arrow_back_ios_new_24"
-            app:tint="#11117F" />
+            app:tint="@color/primary" />
     </androidx.cardview.widget.CardView>
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tvFood"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="@dimen/spacing_sm"
         android:fontFamily="@font/kanit_extra_bold"
         android:gravity="center"
         android:includeFontPadding="false"
         android:text="Order Food"
-        android:textColor="#11117F"
+        android:textColor="@color/primary"
         android:textSize="20sp"
         app:layout_constraintBottom_toBottomOf="@id/cardViewBack"
         app:layout_constraintEnd_toEndOf="parent"
@@ -47,32 +50,42 @@
         android:id="@+id/etSearch"
         android:layout_width="0dp"
         android:layout_height="50dp"
-        android:layout_marginHorizontal="10dp"
-        android:layout_marginTop="15dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:padding="10dp"
+        android:layout_marginHorizontal="@dimen/spacing_md"
+        android:layout_marginTop="@dimen/spacing_md"
+        android:background="@drawable/bg_input_field"
+        android:drawablePadding="8dp"
+        android:fontFamily="@font/kanit_regular"
         android:hint="Tìm kiếm món ăn..."
-        android:textColor="#1E293B"
-        app:layout_constraintTop_toBottomOf="@id/cardViewBack"
+        android:paddingHorizontal="@dimen/spacing_md"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_muted"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/cardViewBack" />
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="@dimen/spacing_sm"
+        android:background="@color/bg_app"
+        app:tabIndicatorColor="@color/primary"
         app:tabMode="scrollable"
-        app:layout_constraintTop_toBottomOf="@id/etSearch"
+        app:tabSelectedTextColor="@color/primary"
+        app:tabTextColor="@color/text_secondary"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/etSearch" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="5dp"
-        android:layout_marginBottom="10dp"
+        android:layout_marginTop="@dimen/spacing_xs"
+        android:clipToPadding="false"
+        android:paddingHorizontal="@dimen/spacing_sm"
+        android:paddingBottom="@dimen/spacing_sm"
         android:visibility="gone"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintBottom_toTopOf="@+id/btnDone"
@@ -86,13 +99,13 @@
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/btnDone"
         android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:layout_margin="16dp"
-        android:background="@drawable/bg_button"
+        android:layout_height="52dp"
+        android:layout_margin="@dimen/spacing_md"
+        android:background="@drawable/bg_button_primary"
+        android:fontFamily="@font/kanit_bold"
         android:text="Chốt Order (Về Bàn)"
-        android:textColor="@color/white"
+        android:textColor="@android:color/white"
         android:textSize="16sp"
-        android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
@@ -101,7 +114,7 @@
         android:id="@+id/ivEmpty"
         android:layout_width="100dp"
         android:layout_height="100dp"
-        android:layout_marginTop="50dp"
+        android:layout_marginTop="@dimen/spacing_xl"
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

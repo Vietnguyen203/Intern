@@ -34,15 +34,19 @@ class CheckoutDialogFragment : DialogFragment() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogCheckoutBinding.inflate(requireActivity().layoutInflater)
 
-        // Hiển thị tổng tiền ban đầu từ cache của orderTotalFlow nếu có
-        val cachedTotal = viewModel.orderTotalFlow.replayCache.lastOrNull()
-        cachedTotal?.let {
-            currentTotalAmount = it
+        // Hiển thị tạm tổng tiền từ cache (nếu dialog từng mở trước đó trong cùng phiên bàn này),
+        // rồi luôn gọi lại loadCheckoutSummary() bên dưới để lấy đủ TẤT CẢ đơn PENDING/CONFIRMED
+        // hiện tại của bàn (tránh sót đơn "gọi thêm" mới tạo sau khi mở màn Order Table).
+        val cachedSummary = viewModel.checkoutSummaryFlow.value
+        cachedSummary?.let {
+            currentTotalAmount = it.totalAmount
             updateTotalAndQr(it)
         }
 
         // Lắng nghe flow để cập nhật UI / kết quả
         collectFlows()
+
+        viewModel.loadCheckoutSummary(userToken())
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(binding.root)
@@ -78,12 +82,13 @@ class CheckoutDialogFragment : DialogFragment() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
 
-                // Cập nhật tổng tiền & QR khi orderTotalFlow thay đổi
+                // Cập nhật tổng tiền gộp & QR khi checkoutSummaryFlow thay đổi (thay cho
+                // orderTotalFlow cũ chỉ theo dõi đúng 1 đơn — xem OrderTableViewModel.loadCheckoutSummary)
                 launch {
-                    viewModel.orderTotalFlow.collect { total ->
-                        if (total != null) {
-                            currentTotalAmount = total
-                            updateTotalAndQr(total)
+                    viewModel.checkoutSummaryFlow.collect { summary ->
+                        if (summary != null) {
+                            currentTotalAmount = summary.totalAmount
+                            updateTotalAndQr(summary)
                         }
                     }
                 }
@@ -108,8 +113,17 @@ class CheckoutDialogFragment : DialogFragment() {
         }
     }
 
-    private fun updateTotalAndQr(total: Double) {
+    private fun updateTotalAndQr(summary: OrderTableViewModel.CheckoutSummary) {
+        val total = summary.totalAmount
         binding.tvTotal.text = getString(R.string.pay_total_0).replace("0 ₫", money(total))
+
+        // Bàn có từ 2 đơn PENDING/CONFIRMED trở lên (VD: khách gọi thêm món) -> báo rõ đang gộp mấy
+        // đơn để nhân viên không thắc mắc sao tổng tiền cao hơn đơn đang xem trên màn Order Table.
+        binding.tvDialogSub.text = if (summary.orderCount > 1) {
+            "Gộp ${summary.orderCount} đơn của bàn — " + getString(R.string.pay_subtitle)
+        } else {
+            getString(R.string.pay_subtitle)
+        }
 
         if (total > 0) {
             val qrUrl = "https://img.vietqr.io/image/970407-19037974181012-print.jpg" +

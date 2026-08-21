@@ -67,6 +67,9 @@ class SystemMenuDialog private constructor(
         view.findViewById<View>(R.id.menuViewInventory)?.setOnClickListener {
             onSelect("INVENTORY"); dismiss()
         }
+        view.findViewById<View>(R.id.menuViewProfile)?.setOnClickListener {
+            onSelect("PROFILE"); dismiss()
+        }
 
         // --- Role based visibility ---
         when (userRole) {

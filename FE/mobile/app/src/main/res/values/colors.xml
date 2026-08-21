@@ -13,4 +13,46 @@
     <color name="status_completed">#4CAF50</color>  <!-- xanh -->
     <color name="colorPrimary">#11117F</color>
     <color name="gray">#9E9E9E</color>
+
+    <!-- ================================================================
+         Design tokens dùng chung — đồng bộ 1:1 với biến CSS bên Web
+         (fe-web-work/src/index.css :root, comment gốc "Brand Sync with
+         Android App"). Mọi màn hình nâng cấp giao diện (A5 — đồng bộ các
+         màn còn cũ) nên dùng các token này thay vì hardcode hex rải rác.
+         ================================================================ -->
+    <color name="primary">#11117F</color>
+    <color name="primary_light">#0D11117F</color>   <!-- rgba(17,17,127,.05) -->
+    <color name="primary_border">#3311117F</color>  <!-- rgba(17,17,127,.2) -->
+    <color name="primary_hover">#0A0A5E</color>
+    <color name="secondary">#0934DB</color>
+
+    <color name="bg_app">#F8FAFC</color>
+    <color name="bg_surface">#FFFFFF</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_muted">#94A3B8</color>
+    <color name="border_color">#E2E8F0</color>
+
+    <!-- Status chip system (Phương án A — nhẹ nhàng, mirror Web) -->
+    <color name="chip_pending_bg">#FFF7E6</color>
+    <color name="chip_pending_text">#B45309</color>
+    <color name="chip_cooking_bg">#FDEEEA</color>
+    <color name="chip_cooking_text">#C1440E</color>
+    <color name="chip_ready_bg">#E9F9EE</color>
+    <color name="chip_ready_text">#0D7A30</color>
+    <color name="chip_urgent_bg">#FEF2F2</color>
+    <color name="chip_urgent_border">#DC2626</color>
+    <color name="chip_neutral_bg">#F1F5F9</color>
+    <color name="chip_neutral_text">#475569</color>
+
+    <color name="accent_pending">#F59E0B</color>
+    <color name="accent_cooking">#EF4444</color>
+    <color name="accent_ready">#10B981</color>
+    <color name="accent_danger">#DC2626</color>
+
+    <!-- Nút hành động -->
+    <color name="btn_cook">#EC835A</color>
+    <color name="btn_ready">#0CA30C</color>
+    <color name="btn_wait_bg">#EEF2FF</color>
+    <color name="btn_wait_text">#4338CA</color>
 </resources>

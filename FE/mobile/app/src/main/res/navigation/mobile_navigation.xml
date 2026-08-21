@@ -148,7 +148,17 @@
         android:label="Kitchen Console"
         tools:layout="@layout/fragment_kitchen">
         <deepLink app:uri="fo://kitchen" />
+        <action
+            android:id="@+id/action_navigation_kitchen_to_navigation_kds_settings"
+            app:destination="@id/navigation_kds_settings" />
     </fragment>
+
+    <!-- KDS Settings: ngưỡng cảnh báo/tự động chuyển trạng thái của màn Bếp (A3) -->
+    <fragment
+        android:id="@+id/navigation_kds_settings"
+        android:name="com.food.order.ui.kitchen.KdsSettingsFragment"
+        android:label="KDS Settings"
+        tools:layout="@layout/fragment_kds_settings" />
 
     <!-- Logout dialog -->
     <dialog
@@ -172,6 +182,16 @@
         android:label="Inventory"
         tools:layout="@layout/fragment_inventory">
         <deepLink app:uri="fo://inventory" />
+    </fragment>
+
+    <!-- Profile: màn Hồ sơ cá nhân, trước đây fragment_profile.xml có sẵn nhưng chưa có route/Fragment
+         nào dùng tới (màn "mồ côi") -->
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.food.order.ui.profile.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile">
+        <deepLink app:uri="fo://profile" />
     </fragment>
 
 </navigation>

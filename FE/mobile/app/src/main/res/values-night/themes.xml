@@ -1,14 +1,19 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Theme.FoodOrder" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Primary brand color. -->
-        <item name="colorPrimary">@color/purple_200</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorOnPrimary">@color/black</item>
+        <!-- Primary brand color — đồng bộ với theme sáng thay vì tím/teal mặc định template.
+             LƯU Ý: đây chỉ sửa màu THEME cho các Material component không tự style riêng;
+             phần lớn layout trong app vẫn hardcode @color/white/bg_app (nền sáng) nên bật Dark
+             Mode (Cài đặt > Dark Mode) hiện CHƯA đổi nền/màu chữ của từng màn — cần một đợt làm
+             riêng (values-night cho colors.xml + từng layout) để có Dark Mode đầy đủ, ngoài
+             phạm vi đợt nâng cấp giao diện này. -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_hover</item>
+        <item name="colorOnPrimary">@color/white</item>
         <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorSecondaryVariant">@color/teal_200</item>
-        <item name="colorOnSecondary">@color/black</item>
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorSecondaryVariant">@color/primary_hover</item>
+        <item name="colorOnSecondary">@color/white</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor">@color/white</item>
         <item name="android:windowLightStatusBar">true</item>

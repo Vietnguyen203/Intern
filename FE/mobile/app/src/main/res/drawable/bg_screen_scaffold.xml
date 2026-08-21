@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nền màn hình (app background) — mirror biến bg-app bên Web, tách biệt với card trắng bên trên
+     để tạo chiều sâu thay vì cả màn phẳng một màu trắng như trước. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/bg_app" />
+</shape>

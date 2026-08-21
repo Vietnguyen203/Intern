@@ -189,6 +189,12 @@ export const apiService = {
         getTransactions: () => catalogFetch('GET', '/catalog-service/inventory/transactions'),
         getRecipes: (menuItemId) => catalogFetch('GET', `/catalog-service/inventory/recipes/${menuItemId}`),
         updateRecipes: (menuItemId, data) => catalogFetch('POST', `/catalog-service/inventory/recipes/${menuItemId}`, data),
+
+        // Trừ / hoàn kho khi order — items: [{ menuItemId, quantity }]. deductStock validate ĐỦ số
+        // lượng của TỪNG món trong batch trước khi trừ (all-or-nothing), 400 kèm message chi tiết
+        // (tên nguyên liệu/số lượng thiếu) nếu kho không đủ — xem InventoryService.deductStockForOrder.
+        deductStock: (items) => catalogFetch('POST', '/catalog-service/inventory/deduct', { items }),
+        refundStock: (items) => catalogFetch('POST', '/catalog-service/inventory/refund', { items }),
     },
 
     // ===== ORDER SERVICE (port 8082 via /order proxy) =====

@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Màn Thống kê đơn hàng — nâng cấp theo design system: nền bg_app thay vì trắng phẳng,
+     header dùng token màu primary, card đơn hàng xem chi tiết ở item_order_statistic.xml. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="@color/bg_app"
     tools:context=".ui.dashboard.DashboardFragment">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardViewBack"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="20dp"
-        app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="50dp"
-        app:cardElevation="10dp"
+        android:layout_marginStart="@dimen/spacing_sm"
+        android:layout_marginTop="@dimen/spacing_lg"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:cardCornerRadius="@dimen/radius_pill"
+        app:cardElevation="@dimen/elevation_sm"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
@@ -24,18 +26,18 @@
             android:layout_height="match_parent"
             android:padding="13dp"
             app:srcCompat="@drawable/baseline_arrow_back_ios_new_24"
-            app:tint="#11117F" />
+            app:tint="@color/primary" />
     </androidx.cardview.widget.CardView>
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tvFood"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="@dimen/spacing_sm"
         android:fontFamily="@font/kanit_extra_bold"
         android:includeFontPadding="false"
         android:text="Order Statistic"
-        android:textColor="#11117F"
+        android:textColor="@color/primary"
         android:textSize="20sp"
         app:layout_constraintBottom_toBottomOf="@id/cardViewBack"
         app:layout_constraintStart_toEndOf="@id/cardViewBack"
@@ -45,13 +47,14 @@
         android:id="@+id/recyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="@dimen/spacing_xs"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/spacing_md"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvFood"
-        app:spanCount="2"
         tools:itemCount="10"
         tools:listitem="@layout/item_order_statistic"
         tools:visibility="visible" />

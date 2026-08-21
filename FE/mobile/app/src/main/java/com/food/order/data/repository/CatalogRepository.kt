@@ -4,6 +4,7 @@ import android.content.Context
 import com.food.order.data.CatalogRetrofitClient
 import com.food.order.data.model.ApiResponse
 import com.food.order.data.request.CategoryRequest
+import com.food.order.data.request.DeductStockRequest
 import com.food.order.data.request.MenuItemRequest
 import com.food.order.data.response.CategoryResponse
 import com.food.order.data.response.MenuItemResponse
@@ -11,6 +12,16 @@ import com.food.order.data.response.MenuItemResponse
 object CatalogRepository {
 
     private fun api(ctx: Context) = CatalogRetrofitClient.build(ctx)
+
+    // ===== INVENTORY: TRỪ KHO / HOÀN KHO (order thêm món / huỷ món, huỷ đơn) =====
+
+    suspend fun deductStock(ctx: Context, token: String, request: DeductStockRequest): ApiResponse<Void> {
+        return api(ctx).deductStock(token, request)
+    }
+
+    suspend fun refundStock(ctx: Context, token: String, request: DeductStockRequest): ApiResponse<Void> {
+        return api(ctx).refundStock(token, request)
+    }
 
     // ===== CATEGORIES =====
 

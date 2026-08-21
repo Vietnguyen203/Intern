@@ -15,3 +15,15 @@ data class MenuItemRequest(
     @SerializedName("categoryId") val categoryId: String,
     @SerializedName("imageUrl")   val imageUrl: String? = null
 )
+
+// ===== Trừ kho / hoàn kho khi order (mirror DeductStockRequest.java bên catalog-service) =====
+// Lưu ý: field name phải khớp CHÍNH XÁC camelCase với JSON — CatalogRetrofitClient dùng
+// FieldNamingPolicy.IDENTITY (không tự chuyển snake_case).
+data class DeductStockItem(
+    @SerializedName("menuItemId") val menuItemId: String,
+    @SerializedName("quantity")   val quantity: Int
+)
+
+data class DeductStockRequest(
+    @SerializedName("items") val items: List<DeductStockItem>
+)

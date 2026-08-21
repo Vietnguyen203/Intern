@@ -3,36 +3,54 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
+    <!-- Nền card bo góc trắng cho dialog đăng ký — đồng bộ với dialog_register/forgot_password,
+         thay cho nền trắng phẳng mặc định của Dialog trước đây. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:background="@drawable/bg_dialog_rounded"
         android:padding="20dp">
 
         <EditText
             android:id="@+id/edtUsername"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_input_field"
+            android:fontFamily="@font/kanit_regular"
             android:hint="@string/reg_username"
+            android:textColorHint="@color/text_muted"
+            android:textColor="@color/text_primary"
             android:inputType="textEmailAddress"
+            android:paddingHorizontal="@dimen/spacing_md"
             android:minHeight="48dp" />
 
         <EditText
             android:id="@+id/edtPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:background="@drawable/bg_input_field"
+            android:fontFamily="@font/kanit_regular"
             android:hint="@string/reg_password"
+            android:textColorHint="@color/text_muted"
+            android:textColor="@color/text_primary"
             android:inputType="textPassword"
+            android:paddingHorizontal="@dimen/spacing_md"
             android:minHeight="48dp" />
 
         <EditText
             android:id="@+id/edtPassword2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:background="@drawable/bg_input_field"
+            android:fontFamily="@font/kanit_regular"
             android:hint="@string/reg_confirm_password"
+            android:textColorHint="@color/text_muted"
+            android:textColor="@color/text_primary"
             android:inputType="textPassword"
+            android:paddingHorizontal="@dimen/spacing_md"
             android:minHeight="48dp" />
 
         <LinearLayout
@@ -40,18 +58,30 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="end"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="@dimen/spacing_lg">
 
             <Button
                 android:id="@+id/btnCancel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:background="@drawable/bg_button_outline"
+                android:fontFamily="@font/kanit_medium"
+                android:textAllCaps="false"
+                android:textColor="@color/primary"
+                android:paddingHorizontal="@dimen/spacing_lg"
+                android:paddingVertical="@dimen/spacing_sm"
                 android:text="@string/reg_cancel" />
 
             <Button
                 android:id="@+id/btnRegister"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:background="@drawable/bg_button_primary"
+                android:fontFamily="@font/kanit_medium"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:paddingHorizontal="@dimen/spacing_lg"
+                android:paddingVertical="@dimen/spacing_sm"
                 android:text="@string/reg_action_register"
                 android:layout_marginStart="12dp" />
         </LinearLayout>

@@ -46,7 +46,7 @@ class OrderTableFragment : Fragment() {
                     if (foodId.isNullOrBlank()) {
                         Toast.makeText(requireContext(), "Cannot find foodId for this item", Toast.LENGTH_SHORT).show()
                     } else {
-                        viewModel.removeItemFromOrder(userToken, foodId)
+                        viewModel.removeItemFromOrder(requireContext(), userToken, foodId, item.quantity ?: 0)
                     }
                     dialog.dismiss()
                 }
@@ -101,11 +101,20 @@ class OrderTableFragment : Fragment() {
                     val computedTotal = items.sumOf { (it.price ?: 0.0) * ((it.quantity ?: 0).toDouble()) }
                     val total = if (serverTotal > 0.0) serverTotal else computedTotal
                     binding.tvTotalAmount.text = formatVnd(total)
+
+                    // Chỉ hiện nút "Xác nhận đặt món" khi đơn còn đang PENDING (chưa xác nhận)
+                    binding.btnConfirm.visibility = if (order.status == "PENDING") View.VISIBLE else View.GONE
                 }
             }
             launch {
                 viewModel.cancelOrderFlow.collectLatest {
                     findNavController().popBackStack()
+                }
+            }
+            launch {
+                viewModel.confirmOrderFlow.collectLatest {
+                    Toast.makeText(requireContext(), "Đã xác nhận đặt món — bếp bắt đầu nấu", Toast.LENGTH_SHORT).show()
+                    viewModel.getDetailTable(userToken)
                 }
             }
             launch {
@@ -163,6 +172,10 @@ class OrderTableFragment : Fragment() {
             CheckoutDialogFragment.newInstance().show(childFragmentManager, "CheckoutDialog")
         }
 
+        binding.btnConfirm.setOnClickListener {
+            viewModel.confirmOrder(requireContext(), userToken)
+        }
+
         binding.cardOrder.setOnClickListener {
             val bundle = Bundle().apply { 
                 putString("orderId", viewModel.orderId ?: "")
@@ -178,7 +191,7 @@ class OrderTableFragment : Fragment() {
                 .setTitle("Notification")
                 .setMessage("Are you sure you want to cancel your order, Bitch?")
                 .setPositiveButton("OK") { dialog, _ ->
-                    viewModel.cancelOrder(userToken)
+                    viewModel.cancelOrder(requireContext(), userToken)
                     dialog.dismiss()
                 }
                 .setNegativeButton("Cancel", null)

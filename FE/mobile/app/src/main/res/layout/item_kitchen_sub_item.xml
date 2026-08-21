@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cardTicketRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingBottom="8dp"
-    android:paddingTop="8dp">
+    android:background="@drawable/bg_kds_ticket_normal"
+    android:padding="10dp"
+    android:layout_marginBottom="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -26,7 +28,7 @@
             android:id="@+id/tvQuantity"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
+            android:layout_marginEnd="8dp"
             android:background="#F1F5F9"
             android:paddingHorizontal="8dp"
             android:paddingVertical="2dp"
@@ -39,7 +41,6 @@
             android:id="@+id/tvStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
             android:background="#FFFBEB"
             android:paddingHorizontal="6dp"
             android:paddingVertical="2dp"
@@ -47,25 +48,42 @@
             android:textColor="#D97706"
             android:textSize="11sp"
             android:textStyle="bold" />
+    </LinearLayout>
 
-        <Button
-            android:id="@+id/btnAction"
-            style="?android:attr/buttonStyleSmall"
+    <!-- Meta: thời gian chờ + khu bếp — mirror dòng info bên dưới tên món trên KitchenTicket.jsx -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvWaitTime"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:backgroundTint="#11117F"
-            android:padding="0dp"
-            android:text="Nấu"
-            android:textColor="@android:color/white"
-            android:textSize="11sp"
+            android:layout_height="wrap_content"
+            android:text="⏱️ Vừa xong"
+            android:textColor="#64748B"
+            android:textSize="12sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvStation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text="Khu bếp"
+            android:textColor="#6366F1"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/tvNote"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="6dp"
         android:background="#F8FAFC"
         android:padding="6dp"
         android:text="Ghi chú: Không đường"
@@ -73,9 +91,35 @@
         android:textSize="12sp"
         android:visibility="gone" />
 
-    <View
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:background="#F1F5F9" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnAction"
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="36dp"
+            android:backgroundTint="#11117F"
+            android:padding="0dp"
+            android:text="Nấu"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnPrint"
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="44dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="#F1F5F9"
+            android:padding="0dp"
+            android:text="🖨️"
+            android:textColor="#334155"
+            android:textSize="14sp" />
+    </LinearLayout>
 </LinearLayout>

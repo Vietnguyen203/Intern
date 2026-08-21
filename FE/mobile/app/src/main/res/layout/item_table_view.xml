@@ -1,30 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-
+<!-- Ô bàn trong lưới Dashboard. Trạng thái (text + nền của #tv) được set động trong
+     TableDashboardAdapter.bind() theo currentOrderId — giữ nguyên id tvName/tv, chỉ nâng cấp style. -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="20dp"
-    android:layout_marginBottom="10dp"
-    android:orientation="vertical">
+    android:layout_marginHorizontal="@dimen/spacing_sm"
+    android:layout_marginBottom="@dimen/spacing_sm"
+    android:background="@drawable/bg_surface_card"
+    android:orientation="vertical"
+    android:padding="@dimen/spacing_sm">
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tvName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="5dp"
-        android:fontFamily="@font/kanit_extra_light"
+        android:layout_marginBottom="@dimen/spacing_xs"
+        android:fontFamily="@font/kanit_medium"
         android:text="Table 1"
-        android:textColor="@color/black" />
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tv"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="44dp"
         android:background="@drawable/bg_empty_table_view"
-        android:fontFamily="@font/kanit_extra_bold"
+        android:fontFamily="@font/kanit_bold"
         android:gravity="center"
         android:includeFontPadding="false"
         android:text="Free"
-        android:textColor="#151515"
-        android:textSize="18sp" />
+        android:textColor="@color/text_primary"
+        android:textSize="15sp" />
 </androidx.appcompat.widget.LinearLayoutCompat>

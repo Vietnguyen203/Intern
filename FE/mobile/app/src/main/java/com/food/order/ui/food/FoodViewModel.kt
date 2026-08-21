@@ -16,6 +16,8 @@ import com.food.order.data.repository.CatalogRepository
 import com.food.order.data.repository.FileRepository
 import com.food.order.data.repository.OrderRepository
 import com.food.order.data.request.AddOrderItemRequest
+import com.food.order.data.request.DeductStockItem
+import com.food.order.data.request.DeductStockRequest
 import com.food.order.data.request.MenuItemRequest
 import com.food.order.data.response.CategoryResponse
 import com.food.order.data.response.MenuItemResponse
@@ -211,14 +213,31 @@ class FoodViewModel : ViewModel() {
 
     var activeOrderId: String? = null
 
-    fun addOrderItem(token: String, orderId: String, tableId: String, food: FoodModel, quantity: Int, note: String) {
+    fun addOrderItem(context: Context, token: String, orderId: String, tableId: String, food: FoodModel, quantity: Int, note: String) {
         viewModelScope.launch {
             _loadingFlow.emit(true)
+            // true kể từ lúc trừ kho thành công cho tới khi thêm món vào đơn thực sự thành công —
+            // nếu vẫn còn true ở finally nghĩa là có bước sau đó thất bại/lỗi giữa chừng, cần hoàn kho
+            // lại phần vừa trừ để tránh lệch số liệu kho (kho báo thiếu trong khi đơn chưa thực sự có món).
+            var deductedPendingCompensation = false
             try {
+                // ✅ Trừ kho NGAY khi thêm món vào đơn, validate đủ nguyên liệu cho ĐỦ số lượng yêu cầu
+                // (không phải lúc bếp bắt đầu nấu hay lúc thanh toán) — nếu kho không đủ, BE trả lỗi
+                // 400 kèm message chi tiết (VD: gọi 5 suất nhưng kho chỉ đủ 3) và chặn luôn việc thêm món.
+                val deductRes = catalogRepository.deductStock(
+                    context, token,
+                    DeductStockRequest(items = listOf(DeductStockItem(menuItemId = food.id, quantity = quantity)))
+                )
+                if (!deductRes.isSuccess) {
+                    _errorFlow.emit(deductRes.message ?: "Không đủ nguyên liệu trong kho để thêm món này")
+                    return@launch
+                }
+                deductedPendingCompensation = true
+
                 var currentOrderId = activeOrderId ?: orderId
                 if (currentOrderId.isEmpty() && tableId.isNotEmpty()) {
                     val createRes = orderRepository.createOrder(
-                        token, 
+                        token,
                         com.food.order.data.request.OrderRequest(tableId = tableId, items = emptyList())
                     )
                     if (createRes.isSuccess && createRes.data?.id != null) {
@@ -226,14 +245,12 @@ class FoodViewModel : ViewModel() {
                         activeOrderId = currentOrderId
                     } else {
                         _errorFlow.emit(createRes.message ?: "Tạo đơn hàng thất bại")
-                        _loadingFlow.emit(false)
                         return@launch
                     }
                 }
 
                 if (currentOrderId.isEmpty()) {
                     _errorFlow.emit("Không thể xác định đơn hàng")
-                    _loadingFlow.emit(false)
                     return@launch
                 }
 
@@ -249,10 +266,36 @@ class FoodViewModel : ViewModel() {
                         note = note
                     )
                 )
-                if (response.isSuccess) _addOrderItemFlow.emit(true) else _errorFlow.emit(response.message ?: "Add failed")
+                if (response.isSuccess) {
+                    deductedPendingCompensation = false
+                    _addOrderItemFlow.emit(true)
+                } else {
+                    _errorFlow.emit(response.message ?: "Add failed")
+                }
             } catch (e: Exception) {
                 _errorFlow.emit(ApiError.parse(e))
-            } finally { _loadingFlow.emit(false) }
+            } finally {
+                if (deductedPendingCompensation) {
+                    refundDeductedStock(context, token, food.id, quantity)
+                }
+                _loadingFlow.emit(false)
+            }
+        }
+    }
+
+    /**
+     * Hoàn kho best-effort khi đã trừ kho thành công nhưng bước tiếp theo (tạo đơn / thêm món vào
+     * đơn) thất bại hoặc lỗi giữa chừng — tránh để kho bị "trừ khống" cho món chưa thực sự vào đơn.
+     * Không throw ra ngoài: nếu hoàn kho cũng lỗi thì chấp nhận lệch kho tạm thời, không chặn luồng chính.
+     */
+    private suspend fun refundDeductedStock(context: Context, token: String, menuItemId: String, quantity: Int) {
+        try {
+            catalogRepository.refundStock(
+                context, token,
+                DeductStockRequest(items = listOf(DeductStockItem(menuItemId = menuItemId, quantity = quantity)))
+            )
+        } catch (_: Exception) {
+            // best-effort — xem docstring ở trên
         }
     }
 

@@ -1,29 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog thanh toán (Checkout) — nâng cấp theo design system chung. Không đổi id nào
+     CheckoutDialogFragment.kt (DialogCheckoutBinding) đang dùng: tvDialogTitle, tvDialogSub,
+     tvTotal, ivQrCode. Lưu ý: tvDialogSub bị Kotlin ghi đè text runtime để hiện "Gộp N đơn của
+     bàn — ..." khi bàn có nhiều đơn PENDING/CONFIRMED — layout chỉ cần giữ đúng id, không cần text
+     cứng đặc biệt gì thêm. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:background="@color/bg_app">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/spacing_md">
 
         <!-- Header -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="4dp"
+            android:layout_marginBottom="@dimen/spacing_sm"
+            app:cardBackgroundColor="@color/bg_surface"
+            app:cardCornerRadius="@dimen/radius_lg"
+            app:cardElevation="@dimen/elevation_sm"
             app:cardUseCompatPadding="true">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="@dimen/spacing_md">
 
                 <TextView
                     android:id="@+id/tvDialogTitle"
@@ -32,16 +39,17 @@
                     android:fontFamily="@font/kanit_extra_bold"
                     android:text="@string/pay_title"
                     android:textAllCaps="true"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/text_primary"
                     android:textSize="18sp" />
 
                 <TextView
                     android:id="@+id/tvDialogSub"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:fontFamily="@font/kanit_medium"
                     android:text="@string/pay_subtitle"
-                    android:textColor="#666666"
+                    android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -50,9 +58,10 @@
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="4dp"
+            android:layout_marginBottom="@dimen/spacing_sm"
+            app:cardBackgroundColor="@color/bg_surface"
+            app:cardCornerRadius="@dimen/radius_lg"
+            app:cardElevation="@dimen/elevation_sm"
             app:cardUseCompatPadding="true">
 
             <LinearLayout
@@ -60,7 +69,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="12dp">
+                android:padding="@dimen/spacing_md">
 
                 <TextView
                     android:id="@+id/tvTotal"
@@ -68,22 +77,23 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/kanit_extra_bold"
                     android:text="@string/pay_total_0"
-                    android:textColor="@android:color/holo_red_dark"
+                    android:textColor="@color/accent_danger"
                     android:textSize="22sp" />
 
                 <ImageView
                     android:id="@+id/ivQrCode"
                     android:layout_width="250dp"
                     android:layout_height="250dp"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/spacing_md"
                     android:scaleType="fitCenter" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:fontFamily="@font/kanit_regular"
                     android:text="Vui lòng quét mã QR để thanh toán"
-                    android:textColor="#666666"
+                    android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>

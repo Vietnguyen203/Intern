@@ -1,337 +1,395 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Form tạo nhân viên — nâng cấp theo design system, bọc NestedScrollView (mirror pattern
+     fragment_create_table.xml: FrameLayout > NestedScrollView + loadingView phủ toàn màn hình).
+     Không đổi id nào CreateStaffFragment.kt đang dùng: cardViewBack, edtEmployeeId, edtPassword,
+     edtDisplayName, edtEmail, edtPhoneNumber, tvBirthdayValue, radioGroupGender, rbMale, rbFemale,
+     radioGroupRole, rbWaiter, rbKitchen, rbAdmin, btnCreate, loadingView. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="@color/bg_app">
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardViewBack"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="20dp"
-        app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="50dp"
-        app:cardElevation="10dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true">
 
-        <androidx.appcompat.widget.AppCompatImageView
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="13dp"
-            app:srcCompat="@drawable/baseline_arrow_back_ios_new_24"
-            app:tint="#11117F" />
-    </androidx.cardview.widget.CardView>
+            android:layout_height="wrap_content">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:fontFamily="@font/kanit_extra_bold"
-        android:includeFontPadding="false"
-        android:text="Create staff"
-        android:textColor="#11117F"
-        android:textSize="20sp"
-        app:layout_constraintBottom_toBottomOf="@id/cardViewBack"
-        app:layout_constraintStart_toEndOf="@id/cardViewBack"
-        app:layout_constraintTop_toTopOf="@id/cardViewBack" />
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardViewBack"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_lg"
+                app:cardBackgroundColor="@color/bg_surface"
+                app:cardCornerRadius="@dimen/radius_pill"
+                app:cardElevation="@dimen/elevation_sm"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvEmployeeId"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="30dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Employee ID"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/cardViewBack" />
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="13dp"
+                    app:srcCompat="@drawable/baseline_arrow_back_ios_new_24"
+                    app:tint="@color/primary" />
+            </androidx.cardview.widget.CardView>
 
-    <EditText
-        android:id="@+id/edtEmployeeId"
-        android:layout_width="0dp"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:fontFamily="@font/kanit_light"
-        android:inputType="text"
-        android:paddingHorizontal="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvEmployeeId" />
+            <androidx.appcompat.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/spacing_sm"
+                android:fontFamily="@font/kanit_extra_bold"
+                android:includeFontPadding="false"
+                android:text="Create staff"
+                android:textColor="@color/primary"
+                android:textSize="20sp"
+                app:layout_constraintBottom_toBottomOf="@id/cardViewBack"
+                app:layout_constraintStart_toEndOf="@id/cardViewBack"
+                app:layout_constraintTop_toTopOf="@id/cardViewBack" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvPassword"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Password"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/edtEmployeeId" />
+            <!-- Card: thông tin đăng nhập -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardAccount"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_lg"
+                app:cardBackgroundColor="@color/bg_surface"
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="@dimen/elevation_sm"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/cardViewBack">
 
-    <EditText
-        android:id="@+id/edtPassword"
-        android:layout_width="0dp"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:fontFamily="@font/kanit_light"
-        android:inputType="textPassword"
-        android:paddingHorizontal="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvPassword" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvDisplayName"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Display name"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/edtPassword" />
+                    <!-- Section header: chỉ trang trí, không có id -->
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/kanit_bold"
+                        android:text="Thông tin đăng nhập"
+                        android:textColor="@color/primary"
+                        android:textSize="13sp" />
 
-    <EditText
-        android:id="@+id/edtDisplayName"
-        android:layout_width="0dp"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:fontFamily="@font/kanit_light"
-        android:inputType="text"
-        android:paddingHorizontal="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvDisplayName" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvEmployeeId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Employee ID"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvEmail"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Email"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/edtDisplayName" />
+                    <EditText
+                        android:id="@+id/edtEmployeeId"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_field"
+                        android:fontFamily="@font/kanit_regular"
+                        android:inputType="text"
+                        android:paddingHorizontal="@dimen/spacing_sm"
+                        android:textColor="@color/text_primary" />
 
-    <EditText
-        android:id="@+id/edtEmail"
-        android:layout_width="0dp"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:fontFamily="@font/kanit_light"
-        android:hint="example@email.com"
-        android:inputType="textEmailAddress"
-        android:paddingHorizontal="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvEmail" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvPassword"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Password"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvPhoneNumber"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Phone number"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/edtEmail" />
+                    <EditText
+                        android:id="@+id/edtPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_field"
+                        android:fontFamily="@font/kanit_regular"
+                        android:inputType="textPassword"
+                        android:paddingHorizontal="@dimen/spacing_sm"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
-    <EditText
-        android:id="@+id/edtPhoneNumber"
-        android:layout_width="0dp"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:fontFamily="@font/kanit_light"
-        android:hint="0xxxxxxxxx"
-        android:inputType="phone"
-        android:paddingHorizontal="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvPhoneNumber" />
+            <!-- Card: thông tin cá nhân -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardPersonal"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_md"
+                app:cardBackgroundColor="@color/bg_surface"
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="@dimen/elevation_sm"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/cardAccount">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvBirthday"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Birthday"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/edtPhoneNumber" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
 
-    <TextView
-        android:id="@+id/tvBirthdayValue"
-        android:layout_width="0dp"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/bg_input_common_border_10"
-        android:fontFamily="@font/kanit_light"
-        android:gravity="center_vertical"
-        android:hint="yyyy-MM-dd"
-        android:paddingHorizontal="10dp"
-        android:drawableStart="@drawable/ic_birthday"
-        android:drawablePadding="10dp"
-        android:textColor="@color/black"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvBirthday" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/kanit_bold"
+                        android:text="Thông tin cá nhân"
+                        android:textColor="@color/primary"
+                        android:textSize="13sp" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvGender"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Gender"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvBirthdayValue" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvDisplayName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Display name"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-    <RadioGroup
-        android:id="@+id/radioGroupGender"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvGender">
+                    <EditText
+                        android:id="@+id/edtDisplayName"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_field"
+                        android:fontFamily="@font/kanit_regular"
+                        android:inputType="text"
+                        android:paddingHorizontal="@dimen/spacing_sm"
+                        android:textColor="@color/text_primary" />
 
-        <RadioButton
-            android:id="@+id/rbMale"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:checked="true"
-            android:fontFamily="@font/kanit_regular"
-            android:gravity="center"
-            android:text="Nam"
-            android:textColor="#11117F" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvEmail"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Email"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-        <RadioButton
-            android:id="@+id/rbFemale"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/kanit_regular"
-            android:gravity="center"
-            android:text="Nữ"
-            android:textColor="#11117F" />
-    </RadioGroup>
+                    <EditText
+                        android:id="@+id/edtEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_field"
+                        android:fontFamily="@font/kanit_regular"
+                        android:hint="example@email.com"
+                        android:inputType="textEmailAddress"
+                        android:paddingHorizontal="@dimen/spacing_sm"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_muted" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvRole"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Role"
-        android:textColor="@color/black"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/radioGroupGender" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvPhoneNumber"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Phone number"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-    <RadioGroup
-        android:id="@+id/radioGroupRole"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvRole">
+                    <EditText
+                        android:id="@+id/edtPhoneNumber"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_field"
+                        android:fontFamily="@font/kanit_regular"
+                        android:hint="0xxxxxxxxx"
+                        android:inputType="phone"
+                        android:paddingHorizontal="@dimen/spacing_sm"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_muted" />
 
-        <RadioButton
-            android:id="@+id/rbWaiter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:checked="true"
-            android:fontFamily="@font/kanit_regular"
-            android:gravity="center"
-            android:text="WAITER"
-            android:textColor="#11117F" />
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvBirthday"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Birthday"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-        <RadioButton
-            android:id="@+id/rbKitchen"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/kanit_regular"
-            android:gravity="center"
-            android:text="KITCHEN"
-            android:textColor="#11117F" />
+                    <TextView
+                        android:id="@+id/tvBirthdayValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_input_field"
+                        android:drawableStart="@drawable/ic_birthday"
+                        android:drawablePadding="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_regular"
+                        android:gravity="center_vertical"
+                        android:hint="yyyy-MM-dd"
+                        android:paddingHorizontal="@dimen/spacing_sm"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_muted" />
 
-        <RadioButton
-            android:id="@+id/rbAdmin"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/kanit_regular"
-            android:gravity="center"
-            android:text="ADMIN"
-            android:textColor="#11117F" />
-    </RadioGroup>
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvGender"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:fontFamily="@font/kanit_extra_light"
+                        android:text="Gender"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/btnCreate"
-        android:layout_width="wrap_content"
-        android:layout_height="50dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="20dp"
-        app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="10dp"
-        app:cardElevation="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/radioGroupRole">
+                    <RadioGroup
+                        android:id="@+id/radioGroupGender"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fontFamily="@font/kanit_extra_bold"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:paddingHorizontal="50dp"
-            android:text="create"
-            android:textAllCaps="true"
-            android:textColor="#11117F" />
-    </androidx.cardview.widget.CardView>
+                        <RadioButton
+                            android:id="@+id/rbMale"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:checked="true"
+                            android:fontFamily="@font/kanit_regular"
+                            android:gravity="center"
+                            android:text="Nam"
+                            android:textColor="@color/primary" />
+
+                        <RadioButton
+                            android:id="@+id/rbFemale"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/kanit_regular"
+                            android:gravity="center"
+                            android:text="Nữ"
+                            android:textColor="@color/primary" />
+                    </RadioGroup>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Card: vai trò -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardRole"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_md"
+                app:cardBackgroundColor="@color/bg_surface"
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="@dimen/elevation_sm"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/cardPersonal">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/tvRole"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/kanit_bold"
+                        android:text="Role"
+                        android:textColor="@color/primary"
+                        android:textSize="13sp" />
+
+                    <RadioGroup
+                        android:id="@+id/radioGroupRole"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/rbWaiter"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:checked="true"
+                            android:fontFamily="@font/kanit_regular"
+                            android:gravity="center"
+                            android:text="WAITER"
+                            android:textColor="@color/primary" />
+
+                        <RadioButton
+                            android:id="@+id/rbKitchen"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/kanit_regular"
+                            android:gravity="center"
+                            android:text="KITCHEN"
+                            android:textColor="@color/primary" />
+
+                        <RadioButton
+                            android:id="@+id/rbAdmin"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/kanit_regular"
+                            android:gravity="center"
+                            android:text="ADMIN"
+                            android:textColor="@color/primary" />
+                    </RadioGroup>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/btnCreate"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                app:cardBackgroundColor="@color/primary"
+                app:cardCornerRadius="@dimen/radius_md"
+                app:cardElevation="@dimen/elevation_sm"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/cardRole">
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="create"
+                    android:textAllCaps="true"
+                    android:textColor="@android:color/white" />
+            </androidx.cardview.widget.CardView>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.core.widget.NestedScrollView>
 
     <com.food.order.utils.widget.FoodOrderLoadingView
         android:id="@+id/loadingView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:clickable="true"
         android:elevation="100dp"
-        android:focusable="true"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        android:focusable="true" />
+</FrameLayout>

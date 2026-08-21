@@ -1,25 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Item lịch sử nhập/xuất kho — nâng cấp theo design system. Không đổi id nào TransactionAdapter.kt
+     đang dùng: tvDate, tvIngredientName, tvType, tvQuantity, tvReason. Màu chữ tvType/tvQuantity và
+     hiển/ẩn tvReason do code set động (Color.parseColor theo loại giao dịch) — giữ nguyên, không sửa. -->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginVertical="6dp"
-    app:cardBackgroundColor="@color/white"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="2dp">
+    android:layout_marginHorizontal="@dimen/spacing_md"
+    android:layout_marginVertical="@dimen/spacing_xs"
+    app:cardBackgroundColor="@color/bg_surface"
+    app:cardCornerRadius="@dimen/radius_lg"
+    app:cardElevation="@dimen/elevation_sm">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp">
+        android:padding="@dimen/spacing_md">
 
         <TextView
             android:id="@+id/tvDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_regular"
             android:text="09/06/2026 14:30"
-            android:textColor="#94A3B8"
+            android:textColor="@color/text_muted"
             android:textSize="12sp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -28,11 +32,13 @@
             android:id="@+id/tvIngredientName"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:ellipsize="end"
+            android:fontFamily="@font/kanit_bold"
+            android:maxLines="1"
             android:text="Thịt bò"
-            android:textColor="#0F172A"
+            android:textColor="@color/text_primary"
             android:textSize="16sp"
-            android:textStyle="bold"
             app:layout_constraintEnd_toStartOf="@+id/tvQuantity"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvDate" />
@@ -41,14 +47,14 @@
             android:id="@+id/tvType"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/spacing_sm"
             android:background="@drawable/bg_transaction_type"
+            android:fontFamily="@font/kanit_medium"
             android:paddingHorizontal="12dp"
             android:paddingVertical="4dp"
             android:text="Nhập kho"
             android:textColor="#10B981"
             android:textSize="12sp"
-            android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvIngredientName" />
 
@@ -56,10 +62,10 @@
             android:id="@+id/tvQuantity"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_bold"
             android:text="+20"
             android:textColor="#10B981"
             android:textSize="18sp"
-            android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -68,9 +74,10 @@
             android:id="@+id/tvReason"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:fontFamily="@font/kanit_regular"
             android:text="Nhập hàng mới"
-            android:textColor="#64748B"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"

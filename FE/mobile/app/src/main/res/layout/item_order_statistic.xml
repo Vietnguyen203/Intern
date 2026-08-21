@@ -1,60 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Card đơn hàng trong màn Thống kê đơn hàng — nâng cấp theo design system
+    (bg_surface + radius_lg + elevation_sm, spacing token thay vì hardcode dp/hex).
+
+    Map màu trạng thái (giữ nguyên logic trong OrderStatisticAdapter.kt, KHÔNG đổi):
+    - order.status == "ORDERING"  -> R.color.status_ordering  (vàng, đơn đang phục vụ)
+    - order.status == "CANCELLED" -> R.color.status_cancelled (đỏ, đơn đã huỷ)
+    - còn lại (COMPLETED, ...)    -> R.color.status_completed (xanh, đơn hoàn tất)
+    Adapter chỉ setTextColor() cho tvStatus (không set background), nên ở layout này
+    tvStatus được bọc dạng badge pill với nền trung tính bg_chip_neutral để chữ màu
+    trạng thái nổi bật trên mọi trường hợp, tương tự badge trong item_kitchen_sub_item.xml.
+-->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="20dp"
-    android:layout_marginTop="10dp"
-    app:cardBackgroundColor="@color/white"
-    app:cardCornerRadius="10dp"
-    app:cardElevation="10dp">
+    android:layout_marginHorizontal="@dimen/spacing_md"
+    android:layout_marginTop="@dimen/spacing_sm"
+    app:cardBackgroundColor="@color/bg_surface"
+    app:cardCornerRadius="@dimen/radius_lg"
+    app:cardElevation="@dimen/elevation_sm">
 
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- Header: mã đơn hàng + badge trạng thái -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="10dp">
+            android:gravity="center_vertical"
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingTop="@dimen/spacing_md"
+            android:paddingBottom="@dimen/spacing_sm">
 
-            <androidx.appcompat.widget.AppCompatTextView
+            <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:fontFamily="@font/kanit_extra_light"
-                android:text="OrderId" />
+                android:orientation="vertical">
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/kanit_extra_light"
+                    android:text="OrderId"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvOrder"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:text="Ta12as8812ble"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
 
             <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/tvOrder"
-                android:layout_width="0dp"
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="2"
+                android:layout_marginStart="@dimen/spacing_sm"
+                android:background="@drawable/bg_chip_neutral"
                 android:fontFamily="@font/kanit_extra_bold"
-                android:text="Ta12as8812ble"
-                android:textColor="@color/black" />
+                android:paddingHorizontal="@dimen/spacing_sm"
+                android:paddingVertical="4dp"
+                android:text="CANCELED"
+                android:textSize="11sp" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:background="#33000000" />
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="@dimen/spacing_md"
+            android:background="@color/border_color" />
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="10dp">
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm">
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="@font/kanit_extra_light"
-                android:text="Table" />
+                android:text="Table"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/tvTable"
@@ -63,27 +104,33 @@
                 android:layout_weight="2"
                 android:fontFamily="@font/kanit_extra_bold"
                 android:text="Table"
-                android:textColor="@color/black" />
+                android:textAlignment="viewEnd"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:background="#33000000" />
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="@dimen/spacing_md"
+            android:background="@color/border_color" />
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="10dp">
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm">
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="@font/kanit_extra_light"
-                android:text="Waiter" />
+                android:text="Waiter"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/tvWaiter"
@@ -92,27 +139,33 @@
                 android:layout_weight="2"
                 android:fontFamily="@font/kanit_extra_bold"
                 android:text="Nguyen Van A"
-                android:textColor="@color/black" />
+                android:textAlignment="viewEnd"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:background="#33000000" />
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="@dimen/spacing_md"
+            android:background="@color/border_color" />
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="10dp">
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm">
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="@font/kanit_extra_light"
-                android:text="Total" />
+                android:text="Total"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/tvTotal"
@@ -121,36 +174,9 @@
                 android:layout_weight="2"
                 android:fontFamily="@font/kanit_extra_bold"
                 android:text="300000 VNĐ"
-                android:textColor="@color/black" />
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:background="#33000000" />
-
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="10dp">
-
-            <androidx.appcompat.widget.AppCompatTextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fontFamily="@font/kanit_extra_light"
-                android:text="Status" />
-
-            <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/tvStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="2"
-                android:fontFamily="@font/kanit_extra_bold"
-                android:text="CANCELED"
-                android:textColor="@color/black" />
+                android:textAlignment="viewEnd"
+                android:textColor="@color/primary"
+                android:textSize="15sp" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
@@ -158,8 +184,9 @@
         <View
             android:id="@+id/dividerItems"
             android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:background="#33000000"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="@dimen/spacing_md"
+            android:background="@color/border_color"
             android:visibility="gone" />
 
         <LinearLayout
@@ -167,16 +194,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="8dp"
-            android:background="#F8FAFC"
+            android:background="@color/bg_app"
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm"
             android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="📋 Chi tiết món ăn"
-                android:textColor="#475569"
+                android:textColor="@color/text_secondary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -186,7 +213,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="8dp" />
+            android:paddingBottom="@dimen/spacing_sm" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 </androidx.cardview.widget.CardView>

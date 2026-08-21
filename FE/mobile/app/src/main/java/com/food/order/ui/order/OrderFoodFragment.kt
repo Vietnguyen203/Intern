@@ -97,6 +97,16 @@ class OrderFoodFragment : Fragment() {
                     // Bỏ tự động popBackStack để user có thể thêm nhiều món
                 }
             }
+            // ✅ Trước đây errorFlow không được lắng nghe ở màn này → lỗi thêm món (kể cả lỗi
+            // "không đủ nguyên liệu trong kho" mới thêm) bị nuốt âm thầm, nhân viên không biết vì sao
+            // món không được thêm. Giờ hiện rõ ra bằng Toast.
+            launch {
+                viewModel.errorFlow.collectLatest { msg ->
+                    if (msg.isNotBlank()) {
+                        Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
         }
 
         binding.btnDone.setOnClickListener {
@@ -234,6 +244,7 @@ class OrderFoodFragment : Fragment() {
             }
 
             viewModel.addOrderItem(
+                requireContext(),
                 userToken,
                 requireArguments().getString("orderId") ?: "",
                 requireArguments().getString("tableId") ?: "",

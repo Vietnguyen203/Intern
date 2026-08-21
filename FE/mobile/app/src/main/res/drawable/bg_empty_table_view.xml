@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bàn trống = sẵn sàng đón khách -> dùng tông xanh lá nhạt (chip_ready) để khớp ngôn ngữ màu
+     chung của app (accent_ready/status_completed = xanh = "ổn/hoàn tất/sẵn sàng"). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/white" />
-    <corners android:radius="10dp" />
+    <solid android:color="@color/chip_ready_bg" />
+    <corners android:radius="@dimen/radius_md" />
     <stroke
         android:width="1dp"
-        android:color="#E6BCBCBC" />
+        android:color="@color/accent_ready" />
 </shape>

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Item lưới menu Dashboard — card trắng bo góc viền mảnh + icon badge tròn, đồng bộ design
+     system chung (radius_lg, border_color, ripple khi bấm). Giữ nguyên id ivIcon/tvTitle đang
+     bind qua ItemDashboardMenuBinding. -->
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="110dp"
     android:layout_margin="8dp"
-    app:cardCornerRadius="16dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="@color/bg_surface"
+    app:cardCornerRadius="@dimen/radius_lg"
+    app:cardElevation="@dimen/elevation_sm"
+    app:strokeColor="@color/border_color"
+    app:strokeWidth="1dp"
     app:cardUseCompatPadding="true">
 
     <LinearLayout
@@ -15,20 +25,30 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <ImageView
-            android:id="@+id/ivIcon"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:contentDescription="@string/app_name"
-            android:visibility="gone"/>
+        <!-- Badge tròn nhạt sau icon cho nổi khối, mirror icon circle bên fragment_profile -->
+        <FrameLayout
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_chip_neutral">
+
+            <ImageView
+                android:id="@+id/ivIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/app_name"
+                android:visibility="gone"
+                app:tint="@color/primary" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textSize="16sp"
-            android:textStyle="bold"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:fontFamily="@font/kanit_bold"
             android:text="Title"/>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

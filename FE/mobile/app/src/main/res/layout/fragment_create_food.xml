@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="@drawable/bg_screen_scaffold">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -17,11 +17,11 @@
                 android:id="@+id/cardViewBack"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginTop="20dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="50dp"
-                app:cardElevation="10dp"
+                android:layout_marginStart="@dimen/spacing_sm"
+                android:layout_marginTop="@dimen/spacing_lg"
+                app:cardBackgroundColor="@color/bg_surface"
+                app:cardCornerRadius="@dimen/radius_pill"
+                app:cardElevation="@dimen/elevation_sm"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent">
 
@@ -30,43 +30,33 @@
                     android:layout_height="match_parent"
                     android:padding="13dp"
                     app:srcCompat="@drawable/baseline_arrow_back_ios_new_24"
-                    app:tint="#11117F" />
+                    app:tint="@color/primary" />
             </androidx.cardview.widget.CardView>
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
+                android:layout_marginStart="@dimen/spacing_sm"
                 android:fontFamily="@font/kanit_extra_bold"
                 android:includeFontPadding="false"
                 android:text="Create food"
-                android:textColor="#11117F"
+                android:textColor="@color/primary"
                 android:textSize="20sp"
                 app:layout_constraintBottom_toBottomOf="@id/cardViewBack"
                 app:layout_constraintStart_toEndOf="@id/cardViewBack"
                 app:layout_constraintTop_toTopOf="@id/cardViewBack" />
 
-            <androidx.appcompat.widget.AppCompatTextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="30dp"
-                android:fontFamily="@font/kanit_extra_light"
-                android:text="Select image"
-                android:textColor="@color/black"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/cardViewBack" />
-
+            <!-- Ảnh món — căn giữa thay vì lệch phải, thêm viền + gợi ý chạm để chọn ảnh -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardViewAvatar"
                 android:layout_width="120dp"
                 android:layout_height="120dp"
-                android:layout_marginTop="20dp"
-                android:layout_marginEnd="50dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="4dp"
+                android:layout_marginTop="@dimen/spacing_lg"
+                app:cardBackgroundColor="@color/bg_app"
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="@dimen/elevation_sm"
                 app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/cardViewBack">
 
                 <androidx.appcompat.widget.AppCompatImageView
@@ -78,29 +68,44 @@
             </androidx.cardview.widget.CardView>
 
             <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tvSelectImageHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:fontFamily="@font/kanit_light"
+                android:text="Nhấn vào ảnh để chọn"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp"
+                app:layout_constraintEnd_toEndOf="@id/cardViewAvatar"
+                app:layout_constraintStart_toStartOf="@id/cardViewAvatar"
+                app:layout_constraintTop_toBottomOf="@id/cardViewAvatar" />
+
+            <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/tvName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="10dp"
-                android:fontFamily="@font/kanit_extra_light"
+                android:layout_marginStart="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:fontFamily="@font/kanit_medium"
                 android:text="Name"
-                android:textColor="@color/black"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/cardViewAvatar" />
+                app:layout_constraintTop_toBottomOf="@id/tvSelectImageHint" />
 
             <EditText
                 android:id="@+id/edtName"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_marginHorizontal="20dp"
-                android:layout_marginTop="5dp"
-                android:background="@drawable/bg_input_common_border_10"
-                android:fontFamily="@font/kanit_light"
+                android:layout_height="48dp"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="@font/kanit_regular"
                 android:hint="Gà cháy tỏi"
                 android:inputType="text"
-                android:paddingHorizontal="10dp"
-                android:textColorHint="#DDDDDD"
+                android:paddingHorizontal="@dimen/spacing_md"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvName" />
@@ -109,29 +114,30 @@
                 android:id="@+id/tvPrice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="10dp"
-                android:fontFamily="@font/kanit_extra_light"
+                android:layout_marginStart="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:fontFamily="@font/kanit_medium"
                 android:text="Price"
-                android:textColor="@color/black"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/edtName" />
 
             <EditText
                 android:id="@+id/edtPrice"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="5dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_xs"
                 android:layout_marginEnd="130dp"
-                android:background="@drawable/bg_input_common_border_10"
-                android:fontFamily="@font/kanit_light"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="@font/kanit_regular"
                 android:hint="20000000"
                 android:inputType="number"
-                android:paddingStart="10dp"
+                android:paddingStart="@dimen/spacing_md"
                 android:paddingEnd="30dp"
-                android:textColor="@color/black"
-                android:textColorHint="#DDDDDD"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvPrice" />
@@ -139,10 +145,11 @@
             <androidx.appcompat.widget.AppCompatTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:fontFamily="@font/kanit_light"
+                android:layout_marginEnd="@dimen/spacing_sm"
+                android:fontFamily="@font/kanit_medium"
                 android:includeFontPadding="false"
                 android:text="VNĐ"
+                android:textColor="@color/text_secondary"
                 app:layout_constraintBottom_toBottomOf="@id/edtPrice"
                 app:layout_constraintEnd_toEndOf="@id/edtPrice"
                 app:layout_constraintTop_toTopOf="@id/edtPrice" />
@@ -151,27 +158,28 @@
                 android:id="@+id/tvUnit"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:fontFamily="@font/kanit_extra_light"
+                android:layout_marginStart="@dimen/spacing_sm"
+                android:fontFamily="@font/kanit_medium"
                 android:text="Unit of measure"
-                android:textColor="@color/black"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
                 app:layout_constraintStart_toEndOf="@id/edtPrice"
                 app:layout_constraintTop_toTopOf="@id/tvPrice" />
 
             <EditText
                 android:id="@+id/edtUnit"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="10dp"
-                android:layout_marginTop="5dp"
-                android:layout_marginEnd="20dp"
-                android:background="@drawable/bg_input_common_border_10"
-                android:fontFamily="@font/kanit_light"
+                android:layout_height="48dp"
+                android:layout_marginStart="@dimen/spacing_sm"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:layout_marginEnd="@dimen/spacing_md"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="@font/kanit_regular"
                 android:hint="Đĩa, Suất..."
                 android:inputType="text"
-                android:paddingHorizontal="10dp"
-                android:textColor="@color/black"
-                android:textColorHint="#DDDDDD"
+                android:paddingHorizontal="@dimen/spacing_sm"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toEndOf="@id/edtPrice"
                 app:layout_constraintTop_toBottomOf="@id/tvUnit" />
@@ -180,11 +188,12 @@
                 android:id="@+id/tvCategory"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="10dp"
-                android:fontFamily="@font/kanit_extra_light"
+                android:layout_marginStart="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:fontFamily="@font/kanit_medium"
                 android:text="Food Category"
-                android:textColor="@color/black"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/edtUnit" />
 
@@ -192,92 +201,98 @@
                 android:id="@+id/radioGroupCategory"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="20dp"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:background="@drawable/bg_surface_card"
                 android:orientation="vertical"
+                android:paddingHorizontal="@dimen/spacing_sm"
+                android:paddingVertical="@dimen/spacing_xs"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvCategory">
 
                 <RadioButton
                     android:id="@+id/rbMainCourse"
-                    android:layout_width="160dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
+                    android:minHeight="40dp"
                     android:checked="true"
+                    android:buttonTint="@color/primary"
                     android:fontFamily="@font/kanit_regular"
                     android:gravity="start|center_vertical"
-                    android:paddingStart="10dp"
+                    android:paddingStart="@dimen/spacing_xs"
                     android:paddingEnd="0dp"
                     android:text="MAIN COURSE"
-                    android:textColor="#11117F" />
+                    android:textColor="@color/text_primary" />
 
                 <RadioButton
                     android:id="@+id/rbAppetizer"
-                    android:layout_width="160dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:layout_weight="1"
+                    android:minHeight="40dp"
+                    android:buttonTint="@color/primary"
                     android:fontFamily="@font/kanit_regular"
                     android:gravity="start|center_vertical"
-                    android:paddingStart="10dp"
+                    android:paddingStart="@dimen/spacing_xs"
                     android:paddingEnd="0dp"
                     android:text="APPETIZER"
-                    android:textColor="#11117F" />
+                    android:textColor="@color/text_primary" />
 
                 <RadioButton
                     android:id="@+id/rbDessert"
-                    android:layout_width="160dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:layout_weight="1"
+                    android:minHeight="40dp"
+                    android:buttonTint="@color/primary"
                     android:fontFamily="@font/kanit_regular"
                     android:gravity="start|center_vertical"
-                    android:paddingStart="10dp"
+                    android:paddingStart="@dimen/spacing_xs"
                     android:paddingEnd="0dp"
                     android:text="DESSERT"
-                    android:textColor="#11117F" />
+                    android:textColor="@color/text_primary" />
 
                 <RadioButton
                     android:id="@+id/rbBeverage"
-                    android:layout_width="160dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:layout_weight="1"
+                    android:minHeight="40dp"
+                    android:buttonTint="@color/primary"
                     android:fontFamily="@font/kanit_regular"
                     android:gravity="start|center_vertical"
-                    android:paddingStart="10dp"
+                    android:paddingStart="@dimen/spacing_xs"
                     android:paddingEnd="0dp"
                     android:text="BEVERAGE"
-                    android:textColor="#11117F" />
+                    android:textColor="@color/text_primary" />
             </RadioGroup>
 
             <EditText
                 android:id="@+id/edtDescription"
                 android:layout_width="0dp"
-                android:layout_height="100dp"
-                android:layout_marginHorizontal="20dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_input_common_border_10"
-                android:fontFamily="@font/kanit_light"
+                android:layout_height="110dp"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:background="@drawable/bg_input_field"
+                android:fontFamily="@font/kanit_regular"
                 android:gravity="start|top"
                 android:hint="Description"
                 android:inputType="textMultiLine"
-                android:padding="10dp"
-                android:textColorHint="#DDDDDD"
+                android:padding="@dimen/spacing_sm"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/radioGroupCategory" />
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/btnCreate"
-                android:layout_width="wrap_content"
-                android:layout_height="50dp"
-                android:layout_marginHorizontal="20dp"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="40dp"
-                app:cardBackgroundColor="@color/white"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="10dp"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="@dimen/spacing_md"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:layout_marginBottom="@dimen/spacing_xl"
+                app:cardBackgroundColor="@color/primary"
+                app:cardCornerRadius="@dimen/radius_md"
+                app:cardElevation="@dimen/elevation_sm"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -289,10 +304,9 @@
                     android:fontFamily="@font/kanit_extra_bold"
                     android:gravity="center"
                     android:includeFontPadding="false"
-                    android:paddingHorizontal="50dp"
                     android:text="create"
                     android:textAllCaps="true"
-                    android:textColor="#11117F" />
+                    android:textColor="@color/white" />
             </androidx.cardview.widget.CardView>
 
         </androidx.constraintlayout.widget.ConstraintLayout>

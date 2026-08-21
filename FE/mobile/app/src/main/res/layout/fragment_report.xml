@@ -1,19 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Màn Báo cáo — nâng cấp giao diện theo design system (UI-only, không đổi text/logic):
+    - Khối số liệu (payment invoice number / employee count / most favorite food) được
+      gom vào 1 card (bg_surface + radius_lg + elevation_sm) thay vì nằm rời trên nền trắng.
+    - 3 badge ORDERING/COMPLETED/CANCELLED trong layoutInvoice đổi từ hex hardcode
+      (#FFAA1C/#1CFF3A/#FF1C1C) sang đúng token màu trạng thái đã có sẵn
+      @color/status_ordering (vàng) / status_completed (xanh) / status_cancelled (đỏ) —
+      cùng bộ màu đang được OrderStatisticAdapter dùng cho trạng thái đơn hàng, chỉ đổi
+      nguồn màu (dùng resource thay vì hex rời rạc), KHÔNG đổi ý nghĩa/logic đếm ở
+      ReportFragment.kt (vẫn where status == "ORDERING"/"COMPLETED"/"CANCELLED").
+    - Khu vực biểu đồ (AnyChartView do Kotlin add động vào layout_any_chart_view) được
+      bọc trong 1 CardView bg_surface để đồng bộ phong cách card với web (mirror
+      App.jsx activeTab === 'Reports'), KHÔNG đổi cấu hình chart/thư viện AnyChart.
+-->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="@color/bg_app">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardViewBack"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="20dp"
-        app:cardBackgroundColor="@color/white"
-        app:cardCornerRadius="50dp"
-        app:cardElevation="10dp"
+        android:layout_marginStart="@dimen/spacing_sm"
+        android:layout_marginTop="@dimen/spacing_lg"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:cardCornerRadius="@dimen/radius_pill"
+        app:cardElevation="@dimen/elevation_sm"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
@@ -22,18 +36,18 @@
             android:layout_height="match_parent"
             android:padding="13dp"
             app:srcCompat="@drawable/baseline_arrow_back_ios_new_24"
-            app:tint="#11117F" />
+            app:tint="@color/primary" />
     </androidx.cardview.widget.CardView>
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="@dimen/spacing_sm"
         android:fontFamily="@font/kanit_extra_bold"
         android:includeFontPadding="false"
         android:text="Report"
-        android:textColor="#11117F"
+        android:textColor="@color/primary"
         android:textSize="20sp"
         app:layout_constraintBottom_toBottomOf="@id/cardViewBack"
         app:layout_constraintStart_toEndOf="@id/cardViewBack"
@@ -42,165 +56,214 @@
     <View
         android:id="@+id/driver"
         android:layout_width="match_parent"
-        android:layout_height="0.5dp"
-        android:layout_marginTop="20dp"
-        android:background="#4D000000"
+        android:layout_height="1dp"
+        android:layout_marginTop="@dimen/spacing_md"
+        android:background="@color/border_color"
         app:layout_constraintTop_toBottomOf="@id/cardViewBack" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tv001"
+    <!-- Card số liệu tổng quan: payment invoice number / breakdown trạng thái /
+         số nhân viên / món ăn yêu thích. Nội dung, id giữ nguyên 100% cho Kotlin,
+         chỉ đổi phần trình bày (card + spacing token) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardStats"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="20dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Payment invoice number:"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/driver"
-        app:layout_constraintWidth_percent="0.44" />
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvPaymentInvoiceNumber"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="20dp"
-        android:fontFamily="@font/kanit_extra_bold"
-        android:text="20"
-        android:textColor="@color/black"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/tv001"
-        app:layout_constraintTop_toBottomOf="@id/driver" />
-
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:id="@+id/layoutInvoice"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="10dp"
+        android:layout_marginHorizontal="@dimen/spacing_md"
+        android:layout_marginTop="@dimen/spacing_md"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:cardCornerRadius="@dimen/radius_lg"
+        app:cardElevation="@dimen/elevation_sm"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv001">
+        app:layout_constraintTop_toBottomOf="@id/driver">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="0dp"
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1.5"
-            android:text="ORDERING"
-            android:textColor="#FFAA1C"
-            android:textSize="11sp" />
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/tvCountOrdering"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/kanit_extra_bold"
-            android:gravity="center"
-            android:text="1"
-            android:textColor="#FFAA1C" />
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="@dimen/spacing_xs">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.5"
-            android:text="COMPLETED"
-            android:textColor="#1CFF3A"
-            android:textSize="11sp" />
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tv001"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/kanit_extra_light"
+                    android:text="Payment invoice number:"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/tvCountCompleted"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/kanit_extra_bold"
-            android:gravity="center"
-            android:text="1"
-            android:textColor="#1CFF3A" />
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvPaymentInvoiceNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:text="20"
+                    android:textColor="@color/primary"
+                    android:textSize="16sp" />
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.5"
-            android:text="CANCELLED"
-            android:textColor="#FF1C1C"
-            android:textSize="11sp" />
+            </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/tvCountCancelled"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/kanit_extra_bold"
-            android:gravity="center"
-            android:text="1"
-            android:textColor="#FF1C1C" />
-    </androidx.appcompat.widget.LinearLayoutCompat>
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/layoutInvoice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:background="@drawable/bg_chip_neutral"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/spacing_sm"
+                android:paddingVertical="@dimen/spacing_sm">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tv002"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Total number of employees:"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/layoutInvoice"
-        app:layout_constraintWidth_percent="0.44" />
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.5"
+                    android:gravity="center"
+                    android:text="ORDERING"
+                    android:textColor="@color/status_ordering"
+                    android:textSize="11sp" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvUserNumber"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="20dp"
-        android:fontFamily="@font/kanit_extra_bold"
-        android:text="2"
-        android:textColor="@color/black"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/tv002"
-        app:layout_constraintTop_toBottomOf="@id/layoutInvoice" />
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvCountOrdering"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/status_ordering" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tv003"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="20dp"
-        android:fontFamily="@font/kanit_extra_light"
-        android:text="Most favorite food:"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv002"
-        app:layout_constraintWidth_percent="0.44" />
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.5"
+                    android:gravity="center"
+                    android:text="COMPLETED"
+                    android:textColor="@color/status_completed"
+                    android:textSize="11sp" />
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tvMostFood"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="20dp"
-        android:fontFamily="@font/kanit_extra_bold"
-        android:textColor="@color/black"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/tv003"
-        app:layout_constraintTop_toBottomOf="@id/tv002" />
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvCountCompleted"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/status_completed" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.5"
+                    android:gravity="center"
+                    android:text="CANCELLED"
+                    android:textColor="@color/status_cancelled"
+                    android:textSize="11sp" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvCountCancelled"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/status_cancelled" />
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:background="@color/border_color" />
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="@dimen/spacing_sm">
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tv002"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/kanit_extra_light"
+                    android:text="Total number of employees:"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvUserNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:text="2"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/border_color" />
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="@dimen/spacing_sm">
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tv003"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/kanit_extra_light"
+                    android:text="Most favorite food:"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/tvMostFood"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/kanit_extra_bold"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </androidx.cardview.widget.CardView>
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        app:layout_constraintTop_toBottomOf="@id/tvMostFood"
-        app:tabIndicatorColor="#11117F"
-        app:tabSelectedTextColor="#11117F"
-        app:tabTextColor="#64748B"
+        android:layout_marginHorizontal="@dimen/spacing_md"
+        android:layout_marginTop="@dimen/spacing_md"
+        android:background="@color/bg_surface"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/cardStats"
+        app:tabGravity="fill"
+        app:tabIndicatorColor="@color/primary"
         app:tabMode="fixed"
-        app:tabGravity="fill">
+        app:tabSelectedTextColor="@color/primary"
+        app:tabTextColor="@color/text_secondary">
 
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
@@ -218,6 +281,29 @@
             android:text="CATE" />
     </com.google.android.material.tabs.TabLayout>
 
+    <!-- Card bọc biểu đồ — chỉ đổi phần vỏ (card + màu nền), KHÔNG đụng vào cấu hình
+         AnyChart bên trong (do ReportFragment.kt tự add/remove AnyChartView động). -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardChart"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="@dimen/spacing_md"
+        android:layout_marginTop="@dimen/spacing_md"
+        android:layout_marginBottom="@dimen/spacing_md"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:cardCornerRadius="@dimen/radius_lg"
+        app:cardElevation="@dimen/elevation_sm"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tabLayout">
+
+        <FrameLayout
+            android:id="@+id/layout_any_chart_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </androidx.cardview.widget.CardView>
+
     <androidx.appcompat.widget.AppCompatImageView
         android:id="@+id/ivEmptyBox"
         android:layout_width="100dp"
@@ -228,14 +314,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tabLayout"
         app:srcCompat="@drawable/ic_empty_box" />
-
-    <FrameLayout
-        android:id="@+id/layout_any_chart_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="10dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tabLayout" />
 
     <ProgressBar
         android:id="@+id/progress_bar"

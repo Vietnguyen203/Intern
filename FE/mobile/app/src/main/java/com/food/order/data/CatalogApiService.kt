@@ -45,6 +45,21 @@ interface CatalogApiService {
         @Header("Authorization") token: String
     ): ApiResponse<List<com.food.order.data.response.TransactionResponse>>
 
+    // ✅ Trừ kho khi order thêm món — validate đủ nguyên liệu cho ĐỦ số lượng yêu cầu, chặn ngay
+    // nếu kho không đủ (BE trả 400 kèm message chi tiết tên nguyên liệu/số lượng thiếu).
+    @POST("catalog-service/inventory/deduct")
+    suspend fun deductStock(
+        @Header("Authorization") token: String,
+        @Body request: com.food.order.data.request.DeductStockRequest
+    ): ApiResponse<Void>
+
+    // ✅ Hoàn kho khi huỷ món / huỷ đơn (hoặc để bù trừ khi 1 bước sau deduct bị lỗi giữa chừng)
+    @POST("catalog-service/inventory/refund")
+    suspend fun refundStock(
+        @Header("Authorization") token: String,
+        @Body request: com.food.order.data.request.DeductStockRequest
+    ): ApiResponse<Void>
+
     // ===== CATEGORIES =====
     @GET("catalog-service/categories")
     suspend fun getCategories(

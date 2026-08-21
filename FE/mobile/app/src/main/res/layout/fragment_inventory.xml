@@ -1,31 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Màn Quản lý Kho — nâng cấp theo design system chung (bg_app, primary, radius, spacing, chip).
+     Không đổi id nào InventoryFragment.kt đang dùng: cardViewBack, ivSync, tabLayout, rvIngredients,
+     rvTransactions, loadingView, emptyView, fabAdd. -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8FAFC">
+    android:background="@color/bg_app">
 
     <!-- Header -->
     <androidx.cardview.widget.CardView
         android:id="@+id/cardViewHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardElevation="4dp"
+        app:cardBackgroundColor="@color/bg_surface"
+        app:cardElevation="@dimen/elevation_sm"
         app:layout_constraintTop_toTopOf="parent">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/white">
+            android:background="@color/bg_surface">
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardViewBack"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:layout_marginStart="16dp"
-                app:cardBackgroundColor="#F1F5F9"
-                app:cardCornerRadius="8dp"
+                android:layout_marginStart="@dimen/spacing_md"
+                app:cardBackgroundColor="@color/bg_app"
+                app:cardCornerRadius="@dimen/radius_sm"
                 app:cardElevation="0dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -36,16 +40,16 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:src="@drawable/baseline_arrow_back_ios_new_24"
-                    app:tint="#0F172A" />
+                    app:tint="@color/text_primary" />
             </androidx.cardview.widget.CardView>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:fontFamily="@font/kanit_bold"
                 android:text="Quản lý Kho"
-                android:textColor="#0F172A"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
-                android:textStyle="bold"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -56,7 +60,7 @@
                 android:id="@+id/ivSync"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:layout_marginEnd="16dp"
+                android:layout_marginEnd="@dimen/spacing_md"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true"
@@ -65,7 +69,7 @@
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
-                app:tint="#11117F" />
+                app:tint="@color/primary" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.cardview.widget.CardView>
@@ -74,10 +78,11 @@
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@color/bg_surface"
         app:layout_constraintTop_toBottomOf="@id/cardViewHeader"
-        app:tabIndicatorColor="#11117F"
-        app:tabSelectedTextColor="#11117F"
-        app:tabTextColor="#64748B"
+        app:tabIndicatorColor="@color/primary"
+        app:tabSelectedTextColor="@color/primary"
+        app:tabTextColor="@color/text_secondary"
         app:tabMode="fixed"
         app:tabGravity="fill">
 
@@ -96,7 +101,7 @@
         android:id="@+id/rvIngredients"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/spacing_sm"
         android:clipToPadding="false"
         android:paddingBottom="80dp"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -107,7 +112,7 @@
         android:id="@+id/rvTransactions"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/spacing_sm"
         android:clipToPadding="false"
         android:paddingBottom="80dp"
         android:visibility="gone"
@@ -140,14 +145,15 @@
             android:layout_width="80dp"
             android:layout_height="80dp"
             android:src="@drawable/icon_food_menu_v2"
-            app:tint="#CBD5E1" />
+            app:tint="@color/text_muted" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:fontFamily="@font/kanit_regular"
             android:text="Chưa có dữ liệu"
-            android:textColor="#64748B"
+            android:textColor="@color/text_secondary"
             android:textSize="16sp" />
     </LinearLayout>
 
@@ -155,10 +161,10 @@
         android:id="@+id/fabAdd"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="24dp"
-        android:layout_marginBottom="24dp"
+        android:layout_marginEnd="@dimen/spacing_lg"
+        android:layout_marginBottom="@dimen/spacing_lg"
         android:src="@android:drawable/ic_input_add"
-        app:backgroundTint="#11117F"
+        app:backgroundTint="@color/primary"
         app:tint="@color/white"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

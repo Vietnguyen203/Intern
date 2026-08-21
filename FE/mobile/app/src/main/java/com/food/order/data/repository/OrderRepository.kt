@@ -30,6 +30,11 @@ object OrderRepository {
     suspend fun complete(token: String, id: String): ApiResponse<Void> =
         api.complete(token, id, "COMPLETED")
 
+    // ✅ Xác nhận đặt món: PENDING -> CONFIRMED. Dùng chung endpoint với complete() vì cùng là
+    // "PATCH order/orders/{id}/status?status=..." — chỉ khác giá trị status truyền vào.
+    suspend fun confirmOrder(token: String, id: String): ApiResponse<Void> =
+        api.complete(token, id, "CONFIRMED")
+
     // ====== ORDER ITEMS ======
     suspend fun addOrderItem(token: String, id: String, request: AddOrderItemRequest): ApiResponse<Void> =
         api.addOrderItem(token, id, request)
