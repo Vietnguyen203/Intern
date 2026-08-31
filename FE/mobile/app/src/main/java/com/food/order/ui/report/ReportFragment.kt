@@ -19,6 +19,7 @@ import com.anychart.enums.Align
 import com.anychart.enums.LegendLayout
 import android.webkit.WebView
 import androidx.navigation.fragment.findNavController
+import com.food.order.data.SessionManager
 import com.food.order.data.response.ReportData
 import com.food.order.databinding.FragmentReportBinding
 import com.google.android.material.tabs.TabLayout
@@ -90,7 +91,7 @@ class ReportFragment : Fragment() {
 
         val sharedPref = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         viewModel.server = sharedPref.getString("server_address", "") ?: ""
-        viewModel.authToken = "Bearer " + (sharedPref.getString("token", "") ?: "")
+        viewModel.authToken = SessionManager.getBearerToken(requireContext())
 
         viewModel.fetchDataInTime()
         binding.cardViewBack.setOnClickListener { findNavController().popBackStack() }

@@ -3,6 +3,7 @@ package com.vietnl.paymentservice.infrastructure.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -29,7 +30,13 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Xác nhận đã thu tiền của khách (đổi payment sang COMPLETED) là nghiệp vụ thu
+                        // ngân/phục vụ, không phải thao tác ai có JWT hợp lệ cũng được gọi — chỉ nhân
+                        // viên phục vụ trở lên mới được xác nhận thanh toán.
+                        .requestMatchers(HttpMethod.PATCH, "/api/payments/order/*/complete").hasAnyRole("WAITER", "ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

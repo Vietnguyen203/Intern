@@ -62,7 +62,6 @@
 //}
 package com.food.order.ui.order
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -75,6 +74,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.food.order.adapter.OrderStatisticAdapter
+import com.food.order.data.SessionManager
 import com.food.order.databinding.FragmentOrderStatisticBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -87,12 +87,7 @@ class OrderStatisticFragment : Fragment() {
 
     private val viewModel: OrderTableViewModel by viewModels()
 
-    private val userToken: String by lazy {
-        val raw = requireContext()
-            .getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            .getString("token", "") ?: ""
-        "Bearer $raw"
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
 
     private val adapter: OrderStatisticAdapter by lazy {
         OrderStatisticAdapter(Collections.emptyList()) {}

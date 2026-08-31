@@ -1,7 +1,6 @@
 package com.food.order.ui.order
 
 import android.app.Dialog
-import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -11,6 +10,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.food.order.R
+import com.food.order.data.SessionManager
 import com.food.order.data.request.CheckoutRequest
 import com.food.order.databinding.DialogCheckoutBinding
 import kotlinx.coroutines.launch
@@ -139,11 +139,7 @@ class CheckoutDialogFragment : DialogFragment() {
         return nf.format(v) + " ₫"
     }
 
-    private fun userToken(): String {
-        return requireContext()
-            .getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            .getString("token", "") ?: ""
-    }
+    private fun userToken(): String = SessionManager.getBearerToken(requireContext())
 
     override fun onDestroyView() {
         super.onDestroyView()

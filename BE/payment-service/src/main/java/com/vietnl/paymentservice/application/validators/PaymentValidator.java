@@ -15,10 +15,10 @@ public class PaymentValidator {
     private final PaymentRepository paymentRepository;
 
     public void validateCreate(CreatePaymentRequest request) {
-        // Kiểm tra đơn hàng đã tồn tại bản ghi thanh toán chưa
-        if (paymentRepository.findByOrderId(request.getOrderId()).isPresent()) {
-            throw new RuntimeException(ExceptionMessage.DUPLICATE_PAYMENT.getMessage());
-        }
+        // Lưu ý: kiểm tra "đơn hàng đã có payment chưa" đã chuyển sang PaymentService.createPayment(),
+        // vì cần phân biệt 2 trường hợp: (1) đã có payment PENDING do client gọi lại sau khi mất kết nối
+        // giữa chừng — coi là idempotent retry, trả về bản ghi cũ; (2) đã có payment COMPLETED — đây mới
+        // thực sự là yêu cầu thanh toán trùng, phải chặn.
 
         // Kiểm tra số tiền
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {

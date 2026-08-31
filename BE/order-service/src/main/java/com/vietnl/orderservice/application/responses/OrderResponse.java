@@ -15,6 +15,7 @@ public class OrderResponse {
     private UUID id;
     private String tableId;
     private String tableNumber;
+    private UUID customerId;
     private String createdBy;
     private String status;
     private String note;
@@ -28,6 +29,7 @@ public class OrderResponse {
         r.setId(order.getId());
         r.setTableId(order.getTableId());
         r.setTableNumber(order.getTableNumber());
+        r.setCustomerId(order.getCustomerId());
         r.setCreatedBy(order.getCreatedBy());
         r.setStatus(order.getStatus());
         r.setNote(order.getNote());

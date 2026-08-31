@@ -22,7 +22,7 @@ dependencies {
     liquibaseRuntime 'com.oracle.database.jdbc:ojdbc11:23.3.0.23.09'
 }
 
-def modules = ['user', 'kitchen', 'order', 'catalog', 'table', 'payment', 'loyalty']
+def modules = ['user', 'order', 'catalog', 'table', 'payment', 'loyalty']
 
 modules.each { moduleName ->
     task "migrate-${moduleName}"(type: JavaExec) {

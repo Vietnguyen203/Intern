@@ -1,6 +1,5 @@
 package com.food.order.ui.order
 
-import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -18,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.food.order.adapter.FoodAdapter
+import com.food.order.data.SessionManager
 import com.food.order.databinding.FragmentOrderFoodBinding
 import com.food.order.ui.food.FoodViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -37,9 +37,7 @@ class OrderFoodFragment : Fragment() {
     private var _binding: FragmentOrderFoodBinding? = null
     private val binding get() = _binding!!
     private val viewModel: FoodViewModel by viewModels()
-    private val userToken: String by lazy {
-        ("Bearer " + requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("token", ""))
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
     private val adapter: FoodAdapter by lazy {
         FoodAdapter(Collections.emptyList(), { item ->
             showOrderOptionsDialog(item)

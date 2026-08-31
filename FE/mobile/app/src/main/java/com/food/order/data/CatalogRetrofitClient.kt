@@ -8,6 +8,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import com.food.order.BuildConfig
 
 /**
  * RetrofitClient riêng cho catalog-service (port 8081).
@@ -40,8 +41,10 @@ object CatalogRetrofitClient {
     private fun createCatalogApi(ctx: Context): CatalogApiService {
         val baseUrl = buildCatalogBaseUrl(ctx)
 
+        // ⚠️ SECURITY: chỉ log full body (có thể chứa password/JWT) ở bản debug; bản release
+        // KHÔNG log body để tránh lộ dữ liệu nhạy cảm qua Logcat.
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
             redactHeader("Authorization")
         }
 

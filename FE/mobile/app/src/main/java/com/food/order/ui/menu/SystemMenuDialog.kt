@@ -15,8 +15,12 @@ class SystemMenuDialog private constructor(
     private val onSelect: (String) -> Unit
 ) : DialogFragment() {
 
+    // ⚠️ AppConstants.userModel là `lateinit var` — phải checkExistsUser() trước khi đọc.
     private val userRole: com.food.order.data.Role by lazy {
-        com.food.order.data.AppConstants.userModel?.role?.let { com.food.order.data.Role.from(it) } ?: com.food.order.data.Role.UNKNOWN
+        if (com.food.order.data.AppConstants.checkExistsUser())
+            com.food.order.data.Role.from(com.food.order.data.AppConstants.userModel.role)
+        else
+            com.food.order.data.Role.UNKNOWN
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -70,6 +74,9 @@ class SystemMenuDialog private constructor(
         view.findViewById<View>(R.id.menuViewProfile)?.setOnClickListener {
             onSelect("PROFILE"); dismiss()
         }
+        view.findViewById<View>(R.id.menuViewReservations)?.setOnClickListener {
+            onSelect("RESERVATIONS"); dismiss()
+        }
 
         // --- Role based visibility ---
         when (userRole) {
@@ -82,6 +89,7 @@ class SystemMenuDialog private constructor(
                 view.findViewById<View>(R.id.menuViewReport)?.visibility = View.GONE
                 view.findViewById<View>(R.id.menuViewKitchen)?.visibility = View.VISIBLE
                 view.findViewById<View>(R.id.menuViewInventory)?.visibility = View.GONE
+                view.findViewById<View>(R.id.menuViewReservations)?.visibility = View.GONE
             }
             com.food.order.data.Role.WAITER -> {
                 view.findViewById<View>(R.id.menuViewDashboard)?.visibility = View.VISIBLE

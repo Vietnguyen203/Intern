@@ -124,6 +124,12 @@ class LoginFragment : Fragment() {
                         AppConstants.userModel = user
                         try { AppConstants.userModel.role = normalizedRole } catch (_: Throwable) {}
 
+                        // 3.5) Đăng ký FCM token lên backend NGAY SAU KHI đăng nhập thành công — lúc
+                        // này SessionManager mới thực sự có token hợp lệ. MainActivity.onCreate() chỉ
+                        // xin quyền POST_NOTIFICATIONS chứ không đăng ký (xem MainActivity), nếu không
+                        // gọi lại ở đây thiết bị sẽ không bao giờ nhận được push notification.
+                        (activity as? com.food.order.MainActivity)?.registerFcmToken()
+
                         // (tuỳ chọn) Thông báo nhỏ để kiểm tra nhanh
                         // Toast.makeText(requireContext(), "Signed in as $normalizedRole", Toast.LENGTH_SHORT).show()
 

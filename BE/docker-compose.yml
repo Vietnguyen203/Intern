@@ -1,14 +1,52 @@
-version: '3.8'
+# Docker Compose cho toan bo backend RMS: ha tang (Kafka, Oracle DB) + 7 service Spring Boot + Gateway.
+# Chay: cd BE && docker compose up -d --build
+# Can co file .env cung thu muc (xem .env.example) de override DB_PASSWORD / JWT_SECRET / JWT_CUSTOMER_SECRET.
+
+x-common-env: &common-env
+  DB_URL: jdbc:oracle:thin:@oracle-db:1521/XEPDB1
+  DB_PASSWORD: ${DB_PASSWORD:-Ab@123456}
+  JWT_SECRET: ${JWT_SECRET:-9B9A6B29C5B726C748C6B6F55DADC5F3C2C9BAF9489AECA17BDE99EBD69153C4}
+  JWT_CUSTOMER_SECRET: ${JWT_CUSTOMER_SECRET:-7F3C9A21E6B84D0F1A2C5E8B90D4F6A37C1E5B8D2A9F4C6E0B3D7A1F5C8E2B94}
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  CATALOG_SERVICE_URL: http://catalog-service:8081
+  ORDER_SERVICE_URL: http://order-service:8082
+  TABLE_SERVICE_URL: http://table-service:8083
+  PAYMENT_SERVICE_URL: http://payment-service:8085
+  NOTIFICATION_SERVICE_URL: http://notification-service:8086
+  USERS_SERVICE_URL: http://users-service:8087
+  LOYALTY_SERVICE_URL: http://loyalty-service:8088
 
 services:
+  # ---------- Ha tang ----------
+
+  oracle-db:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    restart: unless-stopped
+    environment:
+      ORACLE_PASSWORD: ${DB_PASSWORD:-Ab@123456}
+      APP_USER: Food_Order
+      APP_USER_PASSWORD: ${DB_PASSWORD:-Ab@123456}
+    ports:
+      - "1522:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
+    restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
     depends_on:
       - zookeeper
     ports:
@@ -16,18 +54,138 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # 2 listener: INTERNAL cho cac container khac trong docker network goi nhau,
+      # EXTERNAL cho may host (Viet) goi vao tu ben ngoai qua localhost:9092 (vi du debug bang tool tren may).
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:29092"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   kafdrop:
     image: obsidiandynamics/kafdrop
+    restart: unless-stopped
     depends_on:
       - kafka
     ports:
       - "9000:9000"
     environment:
-      KAFKA_BROKERCONNECT: kafka:9092
+      # Dung listener INTERNAL (kafka:29092) vi kafdrop cung la 1 container trong docker network,
+      # KHONG dung listener EXTERNAL (advertise la "localhost", se khong resolve dung tu ben trong container khac).
+      KAFKA_BROKERCONNECT: kafka:29092
       JVM_OPTS: "-Xms32M -Xmx64M"
       SERVER_SERVLET_CONTEXTPATH: "/"
+
+  # ---------- 7 service nghiep vu ----------
+
+  catalog-service:
+    build: ./catalog-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+
+  order-service:
+    build: ./order-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  table-service:
+    build: ./table-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+
+  payment-service:
+    build: ./payment-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  notification-service:
+    build: ./notification-service
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  users-service:
+    build: ./users-service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+
+  loyalty-service:
+    build: ./loyalty-service
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      <<: *common-env
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ---------- Gateway ----------
+
+  gateway-service:
+    build: ./gateway-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *common-env
+    depends_on:
+      - catalog-service
+      - order-service
+      - table-service
+      - payment-service
+      - notification-service
+      - users-service
+      - loyalty-service
+
+volumes:
+  oracle-data:

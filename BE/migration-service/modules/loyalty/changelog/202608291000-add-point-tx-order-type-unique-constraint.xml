@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- Chống cộng điểm trùng khi Kafka redeliver/rebalance cùng 1 orderId: check
+         existsByOrderIdAndType() ở loyalty-service (LoyaltyService.earnPointsForPayment) chỉ là
+         kiểm tra ở tầng ứng dụng (đọc rồi mới ghi), có thể bị race nếu 2 consumer/partition xử lý
+         cùng orderId gần như đồng thời. Ràng buộc UNIQUE (order_id, type) này là lớp bảo vệ thật
+         ở tầng DB. Chỉ có type=EARN (0) mới gán order_id thực sự — REDEEM/EXPIRE/ADJUST luôn để
+         order_id = NULL nên không bị ảnh hưởng (NULL không tham gia so sánh UNIQUE). -->
+    <changeSet id="202608291000-add-point-tx-order-type-unique-constraint" author="Vietnguyen203" labels="202608291000">
+        <addUniqueConstraint tableName="point_transactions"
+                              columnNames="order_id, type"
+                              constraintName="uk_point_tx_order_type"/>
+        <rollback>
+            <dropUniqueConstraint tableName="point_transactions" constraintName="uk_point_tx_order_type"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

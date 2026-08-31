@@ -2,7 +2,6 @@ package com.food.order.ui.food
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.provider.MediaStore
@@ -19,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.food.order.R
+import com.food.order.data.SessionManager
 import com.food.order.data.request.MenuItemRequest
 import com.food.order.databinding.FragmentUpdateFoodBinding
 import kotlinx.coroutines.flow.collectLatest
@@ -31,9 +31,7 @@ class UpdateFoodFragment : Fragment() {
     private var _binding: FragmentUpdateFoodBinding? = null
     private val binding get() = _binding!!
 
-    private val userToken: String by lazy {
-        ("Bearer " + requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("token", ""))
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
     private var imagePickerLauncher: ActivityResultLauncher<Intent> = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result: ActivityResult ->

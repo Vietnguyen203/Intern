@@ -1,5 +1,10 @@
 const API_BASE_URL = '/api';
 
+// Base URL cho kết nối WebSocket (STOMP qua SockJS) — dùng chung quy ước với API,
+// mặc định trỏ về API Gateway ở localhost:8080, có thể override qua biến môi trường
+// VITE_WS_URL khi deploy ở môi trường khác (staging/production).
+export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080';
+
 // Helper lấy token từ cả localStorage và sessionStorage
 const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
 
@@ -79,6 +84,23 @@ export const apiService = {
         return data;
     },
 
+    // Trước đây thiếu hẳn — dashboard.updateTableStatus() gọi apiService.patch(...) nhưng hàm này
+    // chưa từng tồn tại, nên gọi vào là throw "apiService.patch is not a function". table-service
+    // (TableAPI.updateStatus) đã có sẵn @PatchMapping("/{id}/status") từ trước, nên chỉ cần thêm
+    // đúng 1 hàm patch ở đây, mirror y hệt put/delete ở trên — không cần đổi gì bên backend.
+    patch: async (endpoint, payload) => {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        const data = await safeJson(response);
+        if (!response.ok || data.code === 'ERROR') {
+            throw new Error(data.message || `API error: ${response.status}`);
+        }
+        return data;
+    },
+
     // Specific API calls for cleaner components
     auth: {
         login: (username, password, deviceId) =>
@@ -107,6 +129,17 @@ export const apiService = {
         updateTableStatus: (id, status) => apiService.patch(`/tables/${id}/status`, { status }),
         assignTableOrder: (id, orderId) => apiService.post(`/tables/${id}/assign-order`, { orderId }),
         deleteTable: (id) => apiService.delete(`/tables/${id}`),
+        // Token gắn với 1 bàn cụ thể để nhúng vào mã QR — order-service dùng token này xác thực
+        // POST /orders/public thực sự đến từ đúng bàn (yêu cầu đăng nhập, chỉ nhân viên mới lấy được).
+        getTableQrToken: (id) => apiService.get(`/tables/${id}/qr-token`),
+
+        // Đặt bàn trước (table-service) — reservedAtIso dạng "2026-08-22T19:30:00", công khai không cần đăng nhập
+        getAvailableTablesForReservation: (reservedAtIso, partySize) =>
+            apiService.get(`/tables/reservations/available?reservedAt=${encodeURIComponent(reservedAtIso)}&partySize=${partySize}`),
+        createReservation: (data) => apiService.post('/tables/reservations/public', data),
+        getReservations: (from, to) =>
+            apiService.get(from ? `/tables/reservations?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '/tables/reservations'),
+        cancelReservation: (id) => apiService.delete(`/tables/reservations/${id}`),
 
         getRecentOrders: () => apiService.get('/orders?page=0&size=5'),
         getRevenue: () => apiService.get('/orders/revenue-by-week'),
@@ -210,6 +243,11 @@ export const apiService = {
         create: (data) => orderFetch('POST', '/orders', data),
         createPublic: (data) => orderFetch('POST', '/orders/public', data),
 
+        // Dành cho khách hàng (không JWT) — kiểm tra đơn đang mở / gọi thêm món, đều cần đúng tableToken
+        getPublicById: (orderId, tableToken) => orderFetch('GET', `/orders/public/${orderId}?tableToken=${encodeURIComponent(tableToken)}`),
+        addItemPublic: (orderId, tableToken, item) =>
+            orderFetch('POST', `/orders/public/${orderId}/items?tableToken=${encodeURIComponent(tableToken)}`, item),
+
         // Thêm / sửa / xóa món trong đơn
         addItem: (orderId, item) => orderFetch('POST', `/orders/${orderId}/items`, item),
         updateItem: (orderId, itemId, data) => orderFetch('PUT', `/orders/${orderId}/items/${itemId}`, data),
@@ -234,7 +272,10 @@ export const apiService = {
         // Xác nhận đã thu tiền thành công (PATCH -> COMPLETED)
         complete: (orderId, transactionCode) => 
             paymentFetch('PATCH', `/api/payments/order/${orderId}/complete?transactionCode=${transactionCode || ''}`),
-            
+
+        // Đánh dấu thanh toán thất bại (dùng để compensate khi 1 đơn khác trong lượt checkout lỗi)
+        fail: (orderId) => paymentFetch('PATCH', `/api/payments/order/${orderId}/fail`),
+
         // Lấy lịch sử thanh toán của đơn hàng
         getByOrderId: (orderId) => paymentFetch('GET', `/api/payments/order/${orderId}`),
     },

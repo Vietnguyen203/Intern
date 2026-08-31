@@ -1,6 +1,5 @@
 package com.food.order.ui.table
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -26,11 +25,7 @@ class TableFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: TableViewModel by viewModels()
 
-    private val userToken: String by lazy {
-        ("Bearer " + requireContext()
-            .getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            .getString("token", ""))
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
 
     private val adapter: TableAdapter by lazy {
         TableAdapter(Collections.emptyList()) { item ->

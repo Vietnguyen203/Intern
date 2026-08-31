@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Item bàn trống để chọn khi tạo lượt đặt bàn mới (AvailableTableAdapter). Trạng thái chọn được
+     tô nền bằng code trong adapter (primary khi chọn, bg_surface khi chưa chọn) thay vì 2 drawable
+     riêng, để đơn giản hoá logic. -->
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardRoot"
+    android:layout_width="110dp"
+    android:layout_height="72dp"
+    android:layout_marginEnd="@dimen/spacing_sm"
+    app:cardBackgroundColor="@color/bg_surface"
+    app:cardCornerRadius="@dimen/radius_md"
+    app:cardElevation="@dimen/elevation_sm">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvTableNumber"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_bold"
+            android:text="Bàn 5"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvCapacity"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/kanit_regular"
+            android:text="4 chỗ"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp" />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</androidx.cardview.widget.CardView>

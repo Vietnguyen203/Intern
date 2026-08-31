@@ -17,7 +17,7 @@ spring:
       routes:
         # 1. Order Service (8082)
         - id: order_route
-          uri: http://localhost:8082
+          uri: ${ORDER_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/order/**
           filters:
@@ -25,13 +25,13 @@ spring:
 
         # 2. Table Service - WebSocket
         - id: ws_table_route
-          uri: http://localhost:8083
+          uri: ${TABLE_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/ws-tables/**
 
         # 2. Table Service (8083)
         - id: table_route
-          uri: http://localhost:8083
+          uri: ${TABLE_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/tables/**
           filters:
@@ -39,7 +39,7 @@ spring:
 
         # 3. Catalog Service (8081)
         - id: catalog_route
-          uri: http://localhost:8081
+          uri: ${CATALOG_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/catalog/**
           filters:
@@ -47,7 +47,7 @@ spring:
 
         # 4. Payment Service (8085)
         - id: payment_route
-          uri: http://localhost:8085
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8085}
           predicates:
             - Path=/payment/**
           filters:
@@ -55,7 +55,7 @@ spring:
 
         # 5. Users Service (8087)
         - id: user_route
-          uri: http://localhost:8087
+          uri: ${USERS_SERVICE_URL:http://localhost:8087}
           predicates:
             - Path=/api/users-service/**
           filters:
@@ -64,13 +64,13 @@ spring:
 
         # 6. Notification Service - WebSocket
         - id: ws_notification_route
-          uri: http://localhost:8086
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
           predicates:
             - Path=/ws-notifications/**
 
         # 7. Notification Service (8086)
         - id: notification_route
-          uri: http://localhost:8086
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
           predicates:
             - Path=/api/notifications/**
           filters:
@@ -78,7 +78,7 @@ spring:
 
         # 8. Loyalty Service (8088) — tài khoản khách hàng + tích điểm/hạng thành viên
         - id: loyalty_route
-          uri: http://localhost:8088
+          uri: ${LOYALTY_SERVICE_URL:http://localhost:8088}
           predicates:
             - Path=/loyalty/**
           filters:

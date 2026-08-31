@@ -9,7 +9,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 object RoleGuard {
 
-    fun currentRole(): Role = Role.from(AppConstants.userModel?.role)
+    // ⚠️ AppConstants.userModel là `lateinit var` — phải checkExistsUser() trước khi đọc, `?.`
+    // không bảo vệ được lateinit (vẫn ném UninitializedPropertyAccessException).
+    fun currentRole(): Role =
+        Role.from(if (AppConstants.checkExistsUser()) AppConstants.userModel.role else null)
 
     fun hasAny(vararg allowed: Role): Boolean {
         val me = currentRole()
@@ -39,7 +42,8 @@ object RoleGuard {
     }
 
     /** Nhãn role hiện tại, fallback "UNKNOWN" */
-    fun roleLabel(ctx: Context): String = AppConstants.userModel?.role ?: "UNKNOWN"
+    fun roleLabel(ctx: Context): String =
+        if (AppConstants.checkExistsUser()) AppConstants.userModel.role else "UNKNOWN"
 
     /** Helper nhanh: chỉ ADMIN */
     fun requireAdmin(fragment: Fragment): Boolean =

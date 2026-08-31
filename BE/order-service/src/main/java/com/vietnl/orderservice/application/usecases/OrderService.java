@@ -31,12 +31,50 @@ public class OrderService {
     private final CatalogFeignClient catalogFeignClient;
     private final com.vietnl.orderservice.infrastructure.security.JwtUtil jwtUtil;
 
+    // ===== BẢO VỆ POST /orders/public (không có JWT nhân viên, phải tự bảo vệ) =====
+    // Chống spam: tối đa PUBLIC_ORDER_RATE_LIMIT request/bàn trong PUBLIC_ORDER_RATE_WINDOW_MS.
+    private static final int PUBLIC_ORDER_RATE_LIMIT = 8;
+    private static final long PUBLIC_ORDER_RATE_WINDOW_MS = 60_000L;
+    // Chống đặt số lượng bất thường qua QR (khác staff, không giới hạn) trong 1 lần gửi.
+    private static final int PUBLIC_ORDER_MAX_QTY_PER_ITEM = 20;
+    private final java.util.concurrent.ConcurrentHashMap<String, java.util.Deque<Long>> publicOrderRateLimiter =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void checkPublicOrderRateLimit(String tableId) {
+        long now = System.currentTimeMillis();
+        java.util.Deque<Long> hits = publicOrderRateLimiter.computeIfAbsent(
+                tableId, k -> new java.util.concurrent.ConcurrentLinkedDeque<>());
+        synchronized (hits) {
+            while (!hits.isEmpty() && now - hits.peekFirst() > PUBLIC_ORDER_RATE_WINDOW_MS) {
+                hits.pollFirst();
+            }
+            if (hits.size() >= PUBLIC_ORDER_RATE_LIMIT) {
+                throw new RuntimeException("Bàn này vừa gửi quá nhiều yêu cầu đặt món, vui lòng thử lại sau ít phút.");
+            }
+            hits.addLast(now);
+        }
+    }
+
+    // Token QR của bàn (table-service cấp cho nhân viên lúc in QR, hoặc trả kèm lúc khách "đặt bàn
+    // ngay") phải khớp đúng tableId thì mới tin request này thực sự đến từ bàn đó — chặn việc sửa
+    // tableId trong request để đặt món "hộ" bàn khác.
+    private void validateTableToken(String tableId, String tableToken) {
+        if (tableToken == null || tableToken.isBlank() || !jwtUtil.isTokenValid(tableToken)) {
+            throw new RuntimeException("Yêu cầu không hợp lệ: mã QR/bàn không xác thực được, vui lòng quét lại mã QR.");
+        }
+        String subject = jwtUtil.extractUsername(tableToken); // subject = "table:<tableId>"
+        if (!("table:" + tableId).equals(subject)) {
+            throw new RuntimeException("Yêu cầu không hợp lệ: mã QR không khớp với bàn này.");
+        }
+    }
+
     // ===== TẠO ĐƠN HÀNG =====
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, String username, String token) {
         Order order = new Order();
         order.setTableId(request.getTableId());
-        
+        order.setCustomerId(request.getCustomerId());
+
         String authToken = token != null ? (token.startsWith("Bearer ") ? token : "Bearer " + token) : "Bearer " + jwtUtil.generateToken("system", "ADMIN");
 
         if (request.getTableId() != null) {
@@ -117,6 +155,13 @@ public class OrderService {
     // ===== TẠO ĐƠN HÀNG CÔNG KHAI (KHÁCH QUÉT QR) =====
     @Transactional
     public synchronized OrderResponse createPublicOrder(CreateOrderRequest request) {
+        // Request công khai, không có JWT nhân viên -> tự bảo vệ bằng token gắn bàn + rate limit,
+        // trước khi làm bất cứ điều gì khác.
+        if (request.getTableId() != null) {
+            validateTableToken(request.getTableId(), request.getTableToken());
+            checkPublicOrderRateLimit(request.getTableId());
+        }
+
         String systemToken = "Bearer " + jwtUtil.generateToken("system", "ADMIN");
 
         // ===== KIỂM TRA BÀN ĐÃ CÓ ĐƠN HÀNG ĐANG HOẠT ĐỘNG CHƯA =====
@@ -133,6 +178,7 @@ public class OrderService {
 
         Order order = new Order();
         order.setTableId(request.getTableId());
+        order.setCustomerId(request.getCustomerId());
 
         if (request.getTableId() != null) {
             String fetchedTableNum = fetchTableNumber(request.getTableId(), systemToken);
@@ -148,6 +194,11 @@ public class OrderService {
         if (request.getItems() != null) {
             List<Map<String, Object>> itemsToDeduct = new java.util.ArrayList<>();
             for (OrderItemRequest itemReq : request.getItems()) {
+                if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0
+                        || itemReq.getQuantity() > PUBLIC_ORDER_MAX_QTY_PER_ITEM) {
+                    throw new RuntimeException(
+                            "Số lượng món không hợp lệ (tối đa " + PUBLIC_ORDER_MAX_QTY_PER_ITEM + " mỗi món/lần đặt qua QR).");
+                }
                 OrderItem item = new OrderItem();
                 item.setOrder(order);
                 item.setMenuItemId(itemReq.getMenuItemId());
@@ -226,6 +277,43 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + id));
         return OrderResponse.from(order);
+    }
+
+    // ===== LẤY ĐƠN THEO ID (KHÁCH HÀNG, KHÔNG JWT) =====
+    // Dùng để khách kiểm tra đơn đang mở của mình còn hợp lệ không trước khi gọi thêm món (CustomerOrderApp
+    // cache orderId ở sessionStorage máy khách) — bắt buộc tableToken đúng bàn của đơn, không cho xem đơn
+    // của bàn khác dù biết orderId.
+    @Transactional(readOnly = true)
+    public OrderResponse getPublicOrderById(UUID id, String tableToken) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + id));
+        if (order.getTableId() == null) {
+            throw new RuntimeException("Đơn hàng này không gắn với bàn nào.");
+        }
+        validateTableToken(order.getTableId(), tableToken);
+        return OrderResponse.from(order);
+    }
+
+    // ===== THÊM MÓN VÀO ĐƠN (KHÁCH HÀNG, KHÔNG JWT) =====
+    // Trước đây CustomerOrderApp gọi thẳng addItemToOrder qua POST /orders/{id}/items — endpoint đó
+    // nằm sau anyRequest().authenticated() nên khách ẩn danh (không có JWT nhân viên) bị 403 âm thầm,
+    // khiến "gọi thêm món vào đơn đang mở" luôn rơi vào nhánh tạo đơn mới thay vì cộng dồn. Endpoint
+    // public riêng này xác thực bằng tableToken (giống hệt createPublicOrder) rồi mới cho thêm món.
+    @Transactional
+    public OrderResponse addItemToPublicOrder(UUID orderId, OrderItemRequest request, String tableToken) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + orderId));
+        if (order.getTableId() == null) {
+            throw new RuntimeException("Đơn hàng này không gắn với bàn nào, không thể gọi thêm món qua QR.");
+        }
+        validateTableToken(order.getTableId(), tableToken);
+        checkPublicOrderRateLimit(order.getTableId());
+        if (request.getQuantity() == null || request.getQuantity() <= 0
+                || request.getQuantity() > PUBLIC_ORDER_MAX_QTY_PER_ITEM) {
+            throw new RuntimeException(
+                    "Số lượng món không hợp lệ (tối đa " + PUBLIC_ORDER_MAX_QTY_PER_ITEM + " mỗi món/lần đặt qua QR).");
+        }
+        return addItemToOrder(orderId, request);
     }
 
     // ===== THÊM MÓN VÀO ĐƠN =====

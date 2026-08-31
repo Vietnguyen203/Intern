@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.food.order.data.ApiError
+import com.food.order.data.KitchenRefreshBus
 import com.food.order.data.SessionManager
 import com.food.order.data.repository.CatalogRepository
 import com.food.order.data.repository.OrderRepository
@@ -87,6 +88,7 @@ class KitchenViewModel(app: Application) : AndroidViewModel(app) {
 
     private var pollingJob: Job? = null
     private var tickerJob: Job? = null
+    private var refreshBusJob: Job? = null
     private var lastToken: String = ""
 
     fun setViewMode(mode: KitchenViewMode) {
@@ -125,11 +127,22 @@ class KitchenViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // Refresh sớm khi có FCM push liên quan đơn hàng/thanh toán (xem KitchenRefreshBus +
+        // FoodFirebaseMessagingService.onMessageReceived) — bổ sung cho pollingJob 30s ở trên,
+        // không thay thế, vì FCM cần Firebase key thật mới hoạt động.
+        if (refreshBusJob?.isActive != true) {
+            refreshBusJob = viewModelScope.launch {
+                KitchenRefreshBus.events.collect {
+                    fetchKitchenItems(lastToken, silent = true)
+                }
+            }
+        }
     }
 
     fun stopAutoRefresh() {
         pollingJob?.cancel(); pollingJob = null
         tickerJob?.cancel(); tickerJob = null
+        refreshBusJob?.cancel(); refreshBusJob = null
     }
 
     fun fetchKitchenItems(token: String, silent: Boolean = false) {

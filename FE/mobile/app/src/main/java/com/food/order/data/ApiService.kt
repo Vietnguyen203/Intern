@@ -132,6 +132,34 @@ interface ApiService {
         @Path("tableId") id: String
     ): ApiResponse<TableResponse>
 
+    // ===== TABLE RESERVATIONS (đặt bàn trước theo ngày/giờ — khác với "book now"/bookTable ở
+    // DashboardViewModel, vốn chỉ là mở bàn ngay lập tức) =====
+    @GET("api/tables/reservations/available")
+    suspend fun getAvailableTablesForReservation(
+        @Header("Authorization") token: String,
+        @Query("reservedAt") reservedAt: String,
+        @Query("partySize") partySize: Int
+    ): ApiResponse<List<AvailableTableResponse>>
+
+    @POST("api/tables/reservations/public")
+    suspend fun createReservationPublic(
+        @Header("Authorization") token: String,
+        @Body request: ReservationCreateRequest
+    ): ApiResponse<ReservationResponse>
+
+    @GET("api/tables/reservations")
+    suspend fun getReservations(
+        @Header("Authorization") token: String,
+        @Query("from") from: String,
+        @Query("to") to: String
+    ): ApiResponse<List<ReservationResponse>>
+
+    @DELETE("api/tables/reservations/{id}")
+    suspend fun cancelReservation(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): ApiResponse<ReservationResponse>
+
 
     @GET("order/orders/tables/{tableId}/creator")
     suspend fun getCreateByOrder(

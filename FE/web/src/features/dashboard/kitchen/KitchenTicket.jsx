@@ -2,7 +2,7 @@ import { Users, CheckCircle } from 'lucide-react';
 import { KDS_SETTINGS_DEFAULT, getKitchenUrgency, getKitchenWaitMinutes, formatCountdown } from './kitchenUtils';
 import { useAutoCountdown } from './useAutoCountdown';
 
-export const KitchenTicket = ({ item, now, kiosk, onStatusChange, onPrint, thresholds = KDS_SETTINGS_DEFAULT, cookStartMap }) => {
+export const KitchenTicket = ({ item, now, kiosk, onStatusChange, onPrint, onCancelOrder, thresholds = KDS_SETTINGS_DEFAULT, cookStartMap }) => {
   const ks = item.kitchenStatus;
   const chipBg = ks === 'PENDING' ? 'var(--chip-pending-bg)' : ks === 'COOKING' ? 'var(--chip-cooking-bg)' : ks === 'READY' ? 'var(--chip-ready-bg)' : 'var(--bg-app)';
   const chipText = ks === 'PENDING' ? 'var(--chip-pending-text)' : ks === 'COOKING' ? 'var(--chip-cooking-text)' : ks === 'READY' ? 'var(--chip-ready-text)' : 'var(--text-secondary)';
@@ -96,15 +96,35 @@ export const KitchenTicket = ({ item, now, kiosk, onStatusChange, onPrint, thres
           </button>
         )}
         {ks === 'READY' && (
-          // Bếp chỉ nấu xong tới đây — waiter mới là người xác nhận đã trả món cho khách (bên tab Orders).
-          <div style={{ ...btnStyle('var(--btn-wait-bg)'), color: 'var(--btn-wait-text)', textAlign: 'center', cursor: 'default' }}>
-            🔔 Chờ phục vụ trả bàn
-          </div>
+          // Bình thường waiter xác nhận trả món ở tab Orders (theo bàn) — nhưng đơn không gắn với
+          // bàn thật nào (VD đơn cũ lỡ tạo "Mang đi" trước khi có chặn ở CustomerOrderApp.jsx) sẽ
+          // KHÔNG BAO GIỜ hiện ở panel theo bàn đó, nên phải có đường thoát ngay tại đây — bấm được
+          // luôn thay vì chỉ là dòng chữ tĩnh, để không có đơn nào bị kẹt vĩnh viễn.
+          <button onClick={() => onStatusChange(item.id, 'SERVED')}
+            style={{ ...btnStyle('var(--btn-wait-bg)'), color: 'var(--btn-wait-text)' }}>
+            🛎️ Đã trả món
+          </button>
         )}
         {onPrint && (
           <button onClick={() => onPrint(item)} title="In phiếu (mô phỏng — tải ảnh)"
             style={{ padding: kiosk ? '18px' : '8px', minWidth: kiosk ? '56px' : '36px', minHeight: kiosk ? '56px' : 'auto', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: kiosk ? '18px' : '14px' }}>
             🖨️
+          </button>
+        )}
+        {onCancelOrder && (
+          // Nút phụ, luôn có mặt bất kể trạng thái món — lối thoát chung cho MỌI đơn tab Bếp thấy,
+          // kể cả đơn "mồ côi" không thuộc bàn nào (xem comment ở nút "Đã trả món" phía trên).
+          // window.confirm thay vì dùng chung ConfirmDialog của App.jsx vì cụm Kitchen* cố tình
+          // được tách rời, dùng lại y hệt ở cả tab Bếp thường lẫn màn Kiosk độc lập.
+          <button
+            onClick={() => {
+              if (window.confirm(`Huỷ đơn hàng chứa "${item.foodName}"? Nguyên liệu đã trừ sẽ được hoàn lại kho.`)) {
+                onCancelOrder(item.orderId);
+              }
+            }}
+            title="Huỷ đơn hàng"
+            style={{ padding: kiosk ? '18px' : '8px', minWidth: kiosk ? '56px' : '36px', minHeight: kiosk ? '56px' : 'auto', borderRadius: '8px', border: '1px solid var(--chip-urgent-border)', cursor: 'pointer', backgroundColor: 'var(--bg-surface)', color: 'var(--chip-urgent-border)', fontSize: kiosk ? '18px' : '14px' }}>
+            ❌
           </button>
         )}
       </div>

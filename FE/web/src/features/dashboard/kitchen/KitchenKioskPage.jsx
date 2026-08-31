@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiService } from '../../../services/api';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
+import { apiService, WS_BASE_URL } from '../../../services/api';
 import { useToast } from '../../../shared/hooks/useToast';
 import { ToastContainer } from '../../../shared/components/ToastContainer';
 import { useKitchen } from './useKitchen';
@@ -63,6 +65,7 @@ export default function KitchenKioskPage() {
     kitchenCategoryFilter, setKitchenCategoryFilter,
     loading, timeTicker, kdsCookStartRef,
     fetchKitchenData, handleUpdateItemStatus, handleCompleteAllItems,
+    handleCancelOrderFromKitchen,
   } = useKitchen({ toast, tables, foods, categories, kdsSettings });
 
   // Nạp danh sách bàn + món/danh mục 1 lần khi mở trang — dùng để hiện tên bàn và nhóm
@@ -87,6 +90,8 @@ export default function KitchenKioskPage() {
   }, [authed]);
 
   // Tự làm mới món cần chế biến + đọc lại cấu hình KDS (ngưỡng cảnh báo, tự in...) định kỳ.
+  // Đây vẫn là lưới an toàn (phòng khi WebSocket bên dưới rớt kết nối) — nguồn làm mới CHÍNH giờ
+  // là kênh WebSocket real-time ở effect kế tiếp.
   useEffect(() => {
     if (!authed) return;
     fetchKitchenData();
@@ -95,6 +100,33 @@ export default function KitchenKioskPage() {
       setKdsSettings(readKdsSettings());
     }, POLL_MS);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed]);
+
+  // Real-time: nối vào ĐÚNG kênh notification-service mà tab Bếp chính (App.jsx) đang dùng —
+  // order-service đã tự bắn thông báo tiêu đề chứa "Đơn hàng"/"Thanh toán" mỗi khi có đơn mới,
+  // thêm món, đổi trạng thái món, hay huỷ đơn (xem OrderService.sendNotification), nên chỉ cần
+  // lắng nghe đúng kênh này là màn Kiosk thấy món mới NGAY thay vì phải đợi hết POLL_MS.
+  useEffect(() => {
+    if (!authed) return;
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const stompClient = new Client({
+      webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws-notifications`),
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 5000, // Tự động kết nối lại sau 5s nếu bị rớt (mất mạng, backend restart...)
+      onConnect: () => {
+        stompClient.subscribe('/topic/public', (message) => {
+          try {
+            const note = JSON.parse(message.body);
+            if (note.title?.includes('Đơn hàng') || note.title?.includes('Thanh toán')) {
+              fetchKitchenData();
+            }
+          } catch (e) { /* bỏ qua message không parse được */ }
+        });
+      },
+    });
+    stompClient.activate();
+    return () => { if (stompClient.active) stompClient.deactivate(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
@@ -227,6 +259,7 @@ export default function KitchenKioskPage() {
             onStatusChange={handleUpdateItemStatus}
             onCompleteAll={handleCompleteAllItems}
             onPrint={printKitchenTicket}
+            onCancelOrder={handleCancelOrderFromKitchen}
             thresholds={kdsSettings}
             cookStartMap={kdsCookStartRef.current}
           />

@@ -1,7 +1,7 @@
 package com.food.order.ui.table
 
-import android.os.Build
 import android.os.Bundle
+import androidx.core.os.BundleCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.food.order.data.ApiError
@@ -133,17 +133,17 @@ class TableViewModel : ViewModel() {
         }
     }
 
-    @Suppress("DEPRECATION")
+    // ⚠️ Trước đây dùng `getSerializable("edit_table") as TableModel` ở nhánh API cũ — unchecked
+    // cast, ném ClassCastException nếu bundle chứa sai kiểu (hoặc NPE nếu null). Đổi sang
+    // BundleCompat.getSerializable (cùng pattern StaffViewModel.setArgument đang dùng) — an toàn ở
+    // mọi API level, trả về null thay vì crash nếu thiếu/không đúng kiểu.
     fun setArgument(bundle: Bundle?) {
         viewModelScope.launch {
             bundle?.let {
                 if (it.containsKey("edit_table")) {
-                    editTable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        it.getSerializable("edit_table", TableModel::class.java)
-                    } else {
-                        it.getSerializable("edit_table") as TableModel
-                    }
-                    _tableFlow.emit(editTable)
+                    val table = BundleCompat.getSerializable(it, "edit_table", TableModel::class.java)
+                    editTable = table
+                    _tableFlow.emit(table)
                 }
             }
         }

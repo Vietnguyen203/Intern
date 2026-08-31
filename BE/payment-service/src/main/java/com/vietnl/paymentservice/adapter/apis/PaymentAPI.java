@@ -33,4 +33,11 @@ public class PaymentAPI {
     public ResponseEntity<Payment> complete(@PathVariable UUID orderId, @RequestParam(required = false) String transactionCode) {
         return ResponseEntity.ok(paymentService.completePayment(orderId, transactionCode));
     }
+
+    // Dùng cho compensation phía FE: khi 1 đơn khác trong cùng lượt checkout của bàn cập nhật
+    // COMPLETED thất bại, payment vừa tạo (PENDING) cho lượt đó cần được đánh dấu FAILED.
+    @PatchMapping("/order/{orderId}/fail")
+    public ResponseEntity<Payment> fail(@PathVariable UUID orderId) {
+        return ResponseEntity.ok(paymentService.failPayment(orderId));
+    }
 }

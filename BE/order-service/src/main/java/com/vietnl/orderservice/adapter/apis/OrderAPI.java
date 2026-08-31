@@ -65,12 +65,31 @@ public class OrderAPI {
         return ResponseEntity.ok(ApiResponse.ok(orderService.getOrderById(id)));
     }
 
-    // POST /orders/{id}/items - Thêm món vào đơn
+    // GET /orders/public/{id} - Khách hàng (không JWT) kiểm tra đơn đang mở của mình còn hợp lệ không,
+    // trước khi quyết định gọi thêm món vào đơn cũ hay tạo đơn mới. Bắt buộc đúng tableToken của bàn.
+    @GetMapping("/public/{id}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getPublicOrderById(
+            @PathVariable UUID id,
+            @RequestParam String tableToken) {
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getPublicOrderById(id, tableToken)));
+    }
+
+    // POST /orders/{id}/items - Thêm món vào đơn (nhân viên, cần JWT qua Spring Security)
     @PostMapping("/{id}/items")
     public ResponseEntity<ApiResponse<OrderResponse>> addItem(
             @PathVariable UUID id,
             @Valid @RequestBody OrderItemRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("Thêm món thành công", orderService.addItemToOrder(id, request)));
+    }
+
+    // POST /orders/public/{id}/items - Khách hàng (không JWT) gọi thêm món vào đơn đang mở qua QR.
+    // Bắt buộc đúng tableToken của bàn (giống hệt POST /orders/public).
+    @PostMapping("/public/{id}/items")
+    public ResponseEntity<ApiResponse<OrderResponse>> addItemPublic(
+            @PathVariable UUID id,
+            @Valid @RequestBody OrderItemRequest request,
+            @RequestParam String tableToken) {
+        return ResponseEntity.ok(ApiResponse.ok("Thêm món thành công", orderService.addItemToPublicOrder(id, request, tableToken)));
     }
 
     // PUT /orders/{id}/items/{itemId} - Cập nhật số lượng món

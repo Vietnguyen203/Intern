@@ -12,7 +12,7 @@ export const KitchenTab = ({
   kitchenViewMode, setKitchenViewMode,
   kitchenCategoryFilter, setKitchenCategoryFilter,
   loading, timeTicker, kdsSettings, cookStartMap,
-  onStatusChange, onCompleteAll,
+  onStatusChange, onCompleteAll, onCancelOrder,
   onRefresh, onEnterKiosk,
   canProposeFood, onProposeFood,
 }) => {
@@ -88,6 +88,7 @@ export const KitchenTab = ({
               onStatusChange={onStatusChange}
               onCompleteAll={onCompleteAll}
               onPrint={printKitchenTicket}
+              onCancelOrder={onCancelOrder}
               thresholds={kdsSettings}
               cookStartMap={cookStartMap}
             />

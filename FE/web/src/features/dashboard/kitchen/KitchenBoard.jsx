@@ -2,7 +2,7 @@ import { Utensils, Users, CheckCircle } from 'lucide-react';
 import { KDS_SETTINGS_DEFAULT } from './kitchenUtils';
 import { KitchenTicket } from './KitchenTicket';
 
-export const KitchenBoard = ({ items, viewMode, kiosk, now, onStatusChange, onCompleteAll, onPrint, thresholds = KDS_SETTINGS_DEFAULT, cookStartMap }) => {
+export const KitchenBoard = ({ items, viewMode, kiosk, now, onStatusChange, onCompleteAll, onPrint, onCancelOrder, thresholds = KDS_SETTINGS_DEFAULT, cookStartMap }) => {
   if (items.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: kiosk ? '120px 40px' : '80px', color: 'var(--text-secondary)' }}>
@@ -31,7 +31,7 @@ export const KitchenBoard = ({ items, viewMode, kiosk, now, onStatusChange, onCo
                 <span style={{ fontSize: kiosk ? '16px' : '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>{colItems.length}</span>
               </div>
               {colItems.map(item => (
-                <KitchenTicket key={item.id} item={item} now={now} kiosk={kiosk} onStatusChange={onStatusChange} onPrint={onPrint} thresholds={thresholds} cookStartMap={cookStartMap} />
+                <KitchenTicket key={item.id} item={item} now={now} kiosk={kiosk} onStatusChange={onStatusChange} onPrint={onPrint} onCancelOrder={onCancelOrder} thresholds={thresholds} cookStartMap={cookStartMap} />
               ))}
             </div>
           );
@@ -79,7 +79,7 @@ export const KitchenBoard = ({ items, viewMode, kiosk, now, onStatusChange, onCo
           </div>
           <div style={{ padding: kiosk ? '20px 24px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[...tItems].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(item => (
-              <KitchenTicket key={item.id} item={item} now={now} kiosk={kiosk} onStatusChange={onStatusChange} onPrint={onPrint} thresholds={thresholds} cookStartMap={cookStartMap} />
+              <KitchenTicket key={item.id} item={item} now={now} kiosk={kiosk} onStatusChange={onStatusChange} onPrint={onPrint} onCancelOrder={onCancelOrder} thresholds={thresholds} cookStartMap={cookStartMap} />
             ))}
           </div>
         </div>

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 @Component
@@ -37,6 +39,22 @@ public class JwtUtil {
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    // Token nội bộ service-to-service (KHÔNG phải token của nhân viên/khách) — dùng khi payment-service
+    // cần tự gọi sang order-service (vd. lấy customerId của đơn lúc hoàn tất thanh toán để phát sự kiện
+    // Kafka cho loyalty-service). Ký bằng cùng jwt.secret dùng chung giữa các service nội bộ, TTL ngắn vì
+    // chỉ dùng ngay trong 1 lượt gọi Feign chứ không lưu lại.
+    public String generateInternalServiceToken() {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", "SERVICE");
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject("service:payment-service")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 60_000L)) // 60s là đủ cho 1 lượt gọi Feign
+                .signWith(getSignInKey())
+                .compact();
     }
 
     public boolean isTokenValid(String token) {

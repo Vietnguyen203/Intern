@@ -267,7 +267,8 @@ public class InventoryService {
             return;
         }
 
-        // First pass: validate stock
+        // Bước 1: gộp tổng nhu cầu theo từng nguyên liệu (chỉ đọc recipe, không cần khoá — recipe
+        // không đổi trong lúc đặt món).
         java.util.Map<UUID, BigDecimal> totalRequired = new java.util.HashMap<>();
         for (DeductStockRequest.DeductItem item : request.getItems()) {
             List<Recipe> recipes = recipeRepository.findByMenuItemId(item.getMenuItemId());
@@ -281,23 +282,36 @@ public class InventoryService {
             }
         }
 
-        for (java.util.Map.Entry<UUID, BigDecimal> entry : totalRequired.entrySet()) {
-            Ingredient ingredient = ingredientRepository.findById(entry.getKey()).orElse(null);
+        // Bước 2: khoá (SELECT ... FOR UPDATE) từng nguyên liệu ĐÚNG 1 LẦN, theo thứ tự UUID tăng dần
+        // (tránh deadlock khi 2 đơn hàng cùng lúc cần chung nhiều nguyên liệu nhưng theo thứ tự khác
+        // nhau), rồi kiểm tra đủ hàng ngay dưới khoá đó. TRƯỚC ĐÂY bước "kiểm tra" và bước "trừ" tách
+        // rời thành 2 vòng lặp không khoá gì cả — 2 request đặt món cùng lúc cho cùng 1 nguyên liệu đều
+        // có thể đọc thấy đủ hàng trước khi CẢ HAI cùng trừ, khiến tồn kho âm (oversell). Giữ lại entity
+        // đã khoá để dùng lại ở bước 3 (cùng persistence context, không đọc lại nên không mất khoá).
+        List<UUID> orderedIngredientIds = new ArrayList<>(totalRequired.keySet());
+        orderedIngredientIds.sort(Comparator.naturalOrder());
+        Map<UUID, Ingredient> lockedIngredients = new HashMap<>();
+        for (UUID ingredientId : orderedIngredientIds) {
+            Ingredient ingredient = ingredientRepository.findByIdForUpdate(ingredientId).orElse(null);
             if (ingredient == null || !ingredient.isActive()) {
-                throw new RuntimeException("Nguyên liệu đủ!");
+                throw new RuntimeException("Nguyên liệu không tồn tại hoặc đã ngừng sử dụng!");
             }
-            if (ingredient.getCurrentStock() == null || ingredient.getCurrentStock().compareTo(entry.getValue()) < 0) {
-                BigDecimal current = ingredient.getCurrentStock() != null ? ingredient.getCurrentStock() : BigDecimal.ZERO;
-                throw new RuntimeException("Không đủ " + ingredient.getName() + " (Cần " + entry.getValue() + " " + ingredient.getUnit() + ", tồn kho " + current + " " + ingredient.getUnit() + ")");
+            BigDecimal current = ingredient.getCurrentStock() != null ? ingredient.getCurrentStock() : BigDecimal.ZERO;
+            BigDecimal required = totalRequired.get(ingredientId);
+            if (current.compareTo(required) < 0) {
+                throw new RuntimeException("Không đủ " + ingredient.getName() + " (Cần " + required + " " + ingredient.getUnit() + ", tồn kho " + current + " " + ingredient.getUnit() + ")");
             }
+            lockedIngredients.put(ingredientId, ingredient);
         }
 
+        // Bước 3: trừ kho thật sự + ghi log giao dịch theo từng (món, nguyên liệu) như cũ — dùng lại
+        // đúng entity đã khoá ở bước 2, không gọi findById lại.
         for (DeductStockRequest.DeductItem item : request.getItems()) {
             List<Recipe> recipes = recipeRepository.findByMenuItemId(item.getMenuItemId());
             BigDecimal quantitySold = BigDecimal.valueOf(item.getQuantity());
 
             for (Recipe recipe : recipes) {
-                Ingredient ingredient = ingredientRepository.findById(recipe.getIngredientId()).orElse(null);
+                Ingredient ingredient = lockedIngredients.get(recipe.getIngredientId());
                 if (ingredient == null) {
                     continue;
                 }
@@ -348,7 +362,9 @@ public class InventoryService {
             BigDecimal quantityRefunded = BigDecimal.valueOf(item.getQuantity());
 
             for (Recipe recipe : recipes) {
-                Ingredient ingredient = ingredientRepository.findById(recipe.getIngredientId()).orElse(null);
+                // Khoá đúng bản ghi nguyên liệu trước khi cộng lại — tránh lost update khi 2 lượt hoàn
+                // kho (vd. huỷ 2 đơn cùng lúc) cùng đọc currentStock cũ rồi ghi đè lên nhau.
+                Ingredient ingredient = ingredientRepository.findByIdForUpdate(recipe.getIngredientId()).orElse(null);
                 if (ingredient == null) {
                     continue;
                 }

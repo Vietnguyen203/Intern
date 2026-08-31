@@ -2,9 +2,9 @@ spring:
   application:
     name: loyalty-service
   datasource:
-    url: jdbc:oracle:thin:@localhost:1522/XEPDB1
+    url: ${DB_URL:jdbc:oracle:thin:@localhost:1522/XEPDB1}
     username: Food_Order
-    password: Ab@123456
+    password: ${DB_PASSWORD:Ab@123456}
     driver-class-name: oracle.jdbc.OracleDriver
   jpa:
     database-platform: org.hibernate.dialect.OracleDialect
@@ -12,7 +12,7 @@ spring:
       ddl-auto: update
     show-sql: true
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: loyalty-service
   # Gửi OTP email lúc khách hàng tự đăng ký (CustomerService.register 2 bước) — dùng lại đúng tài
@@ -40,15 +40,15 @@ server:
 # đưa lên môi trường thật (đây chỉ là placeholder cho dev, giống cách các service khác đang làm).
 jwt:
   customer:
-    secret: 7F3C9A21E6B84D0F1A2C5E8B90D4F6A37C1E5B8D2A9F4C6E0B3D7A1F5C8E2B94
+    secret: ${JWT_CUSTOMER_SECRET:7F3C9A21E6B84D0F1A2C5E8B90D4F6A37C1E5B8D2A9F4C6E0B3D7A1F5C8E2B94}
     expiration: 2592000000 # 30 ngày — khách dùng trên điện thoại riêng, nên để phiên dài hơn nhân viên
   # JWT của NHÂN VIÊN — PHẢI khớp với jwt.secret bên users-service/order-service/payment-service
   # thì mới xác thực được token thật do users-service phát hành cho waiter lúc checkout.
   staff:
-    secret: 9B9A6B29C5B726C748C6B6F55DADC5F3C2C9BAF9489AECA17BDE99EBD69153C4
+    secret: ${JWT_SECRET:9B9A6B29C5B726C748C6B6F55DADC5F3C2C9BAF9489AECA17BDE99EBD69153C4}
 
-# Tên topic Kafka mà payment-service phát ra khi thanh toán thành công — CHƯA XÁC NHẬN được giá trị
-# thật vì chưa đọc được source payment-service. Sửa lại đúng tên topic thật khi có source.
+# Tên topic Kafka mà payment-service phát PaymentCompletedEvent khi thanh toán COMPLETED — đã khớp
+# với payment.kafka.completed-topic bên payment-service/application.properties.
 loyalty:
   kafka:
     payment-topic: payment-completed

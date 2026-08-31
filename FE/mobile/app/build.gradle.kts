@@ -97,6 +97,9 @@ dependencies {
     // HTTP logging (debug tiện)
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
+    // AndroidX Security — EncryptedSharedPreferences để lưu JWT (thay vì SharedPreferences thường)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // AnyChart (loại bỏ support v4 cũ)
     implementation("com.github.AnyChart:AnyChart-Android:1.1.2") {
         exclude(group = "com.android.support")

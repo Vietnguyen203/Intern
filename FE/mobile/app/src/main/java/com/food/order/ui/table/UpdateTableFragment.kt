@@ -1,7 +1,6 @@
 package com.food.order.ui.table
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,6 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.food.order.data.SessionManager
 import com.food.order.data.request.TableRequest
 import com.food.order.databinding.FragmentUpdateTableBinding
 import kotlinx.coroutines.flow.collectLatest
@@ -21,9 +21,7 @@ class UpdateTableFragment : Fragment() {
     private var _binding: FragmentUpdateTableBinding? = null
     private val binding get() = _binding!!
 
-    private val userToken: String by lazy {
-        ("Bearer " + requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("token", ""))
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
     private val viewModel: TableViewModel by viewModels()
 
     @SuppressLint("SetTextI18n")

@@ -29,7 +29,11 @@ class StaffAdapter(
 
         @SuppressLint("SetTextI18n")
         fun bind(user: UserModel) {
-            binding.tvName.text = if (user.employeeId == AppConstants.userModel.employeeId) "You" else user.displayName
+            // ⚠️ AppConstants.userModel là `lateinit var` — phải checkExistsUser() trước khi đọc,
+            // nếu không truy cập lúc chưa gán sẽ ném UninitializedPropertyAccessException.
+            val isSelf = AppConstants.checkExistsUser() && user.employeeId == AppConstants.userModel.employeeId
+
+            binding.tvName.text = if (isSelf) "You" else user.displayName
             binding.tvEmployeeId.text = "EmployeeID: ${user.employeeId}"
             binding.tvCreateAt.text = "Create At: ${user.createdAt}"
             binding.tvRole.text = "Role: ${user.role}"
@@ -47,7 +51,7 @@ class StaffAdapter(
             }
 
             binding.root.setOnClickListener {
-                if (user.employeeId == AppConstants.userModel.employeeId) {
+                if (isSelf) {
                     Toast.makeText(binding.root.context, "You cannot edit yourself", Toast.LENGTH_SHORT).show()
                 } else {
                     onItemClick(user)

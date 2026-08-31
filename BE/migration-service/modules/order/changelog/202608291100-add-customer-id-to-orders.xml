@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Khách hàng loyalty-service đã đăng nhập lúc đặt món qua QR (nullable — đơn của khách vãng lai
+         hoặc do nhân viên tạo thì để trống). Dùng để payment-service biết cộng điểm cho ai lúc thanh toán.
+         Cột này trước đó chỉ được tạo qua Hibernate ddl-auto=update (Order.java, trường customerId) — 
+         thêm changeset này để Liquibase phản ánh đúng schema thật, phòng khi order-service chuyển sang
+         ddl-auto=validate. -->
+    <changeSet id="202608291100-add-customer-id-to-orders" author="Claude">
+        <addColumn tableName="orders">
+            <column name="customer_id" type="UUID"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="orders" columnName="customer_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

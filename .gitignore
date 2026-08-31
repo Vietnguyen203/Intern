@@ -1,0 +1,5 @@
+# Biến môi trường cục bộ — chứa giá trị thật (mật khẩu DB, JWT secret, ...) khi
+# override các default trong application.properties/yml. KHÔNG commit file này.
+# Xem .env.example để biết các biến cần có.
+.env
+.env.local

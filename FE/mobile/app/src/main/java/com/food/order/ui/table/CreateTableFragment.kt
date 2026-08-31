@@ -1,6 +1,5 @@
 package com.food.order.ui.table
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,6 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.food.order.data.SessionManager
 import com.food.order.data.request.TableRequest
 import com.food.order.databinding.FragmentCreateTableBinding
 import kotlinx.coroutines.flow.collectLatest
@@ -22,9 +22,7 @@ class CreateTableFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: TableViewModel by viewModels()
 
-    private val userToken: String by lazy {
-        ("Bearer " + requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("token", ""))
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentCreateTableBinding.inflate(inflater, container, false)

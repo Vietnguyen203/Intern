@@ -17,8 +17,10 @@ import com.vietnl.loyaltyservice.infrastructure.persistence.repositories.RewardI
 import com.vietnl.loyaltyservice.infrastructure.persistence.repositories.VoucherRedemptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -106,13 +108,28 @@ public class LoyaltyService {
         if (newTier != null) account.setCurrentTierId(newTier.getId());
         loyaltyAccountRepository.save(account);
 
-        pointTransactionRepository.save(PointTransaction.builder()
-                .customerId(customerId)
-                .orderId(orderId)
-                .type(LoyaltyCodes.TX_EARN)
-                .points(earnedPoints)
-                .note("Tích điểm từ đơn hàng #" + (orderId != null ? orderId.toString().substring(0, 8) : "?"))
-                .build());
+        // saveAndFlush (thay vì save) để buộc Hibernate insert ngay tại đây, trong try/catch này,
+        // thay vì trì hoãn tới lúc flush/commit cuối method (lúc đó exception sẽ thoát ra ngoài, không
+        // bắt được gọn gàng nữa). Ràng buộc UNIQUE (order_id, type) ở DB là lớp bảo vệ cuối cùng, phòng
+        // trường hợp existsByOrderIdAndType() phía trên bị race (2 consumer/partition xử lý cùng orderId).
+        try {
+            pointTransactionRepository.saveAndFlush(PointTransaction.builder()
+                    .customerId(customerId)
+                    .orderId(orderId)
+                    .type(LoyaltyCodes.TX_EARN)
+                    .points(earnedPoints)
+                    .note("Tích điểm từ đơn hàng #" + (orderId != null ? orderId.toString().substring(0, 8) : "?"))
+                    .build());
+        } catch (DataIntegrityViolationException ex) {
+            // Vi phạm ràng buộc UNIQUE (order_id, type) -> orderId này đã được cộng điểm rồi (race condition
+            // hiếm gặp, ví dụ Kafka rebalance khiến cùng orderId bị xử lý đồng thời). Đánh dấu rollback toàn
+            // bộ giao dịch (hoàn tác luôn phần cộng điểm account ở trên) rồi bỏ qua nhẹ nhàng, KHÔNG coi là
+            // lỗi hệ thống và KHÔNG ném lại exception để tránh PaymentEventListener log như lỗi thật.
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            log.info("Sự kiện trùng lặp bị bỏ qua (duplicate event ignored) cho orderId={} — " +
+                    "đã tồn tại giao dịch EARN cho đơn hàng này (race condition ở tầng ứng dụng).", orderId);
+            return;
+        }
 
         if (newTier != null && currentTier != null && !newTier.getId().equals(currentTier.getId())) {
             log.info("Khách {} lên hạng {} -> {}", customerId, currentTier.getRank(), newTier.getRank());

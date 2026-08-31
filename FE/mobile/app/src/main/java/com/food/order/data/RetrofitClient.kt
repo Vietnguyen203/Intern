@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit
 import com.google.gson.FieldNamingPolicy
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.food.order.BuildConfig
 
 object RetrofitClient {
 
@@ -95,8 +96,10 @@ object RetrofitClient {
         sp.edit().putString(KEY_BASE_URL, base).apply()
         FILE_BASE_URL = base.removeSuffix("/")
 
+        // ⚠️ SECURITY: chỉ log full body (có thể chứa password/JWT) ở bản debug; bản release
+        // KHÔNG log body để tránh lộ dữ liệu nhạy cảm qua Logcat.
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
             redactHeader("Authorization")
         }
         val client = OkHttpClient.Builder()

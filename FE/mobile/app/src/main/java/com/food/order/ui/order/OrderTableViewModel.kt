@@ -414,7 +414,14 @@ class OrderTableViewModel : ViewModel() {
                     "method" to payload.paymentMethod,
                     "note" to (payload.note ?: "")
                 )
-                orderRepository.createPayment(token, paymentPayload)
+                val paymentRes = orderRepository.createPayment(token, paymentPayload)
+                // ⚠️ Phải chắc chắn ghi nhận thanh toán thành công rồi mới đánh dấu đơn COMPLETED —
+                // trước đây bỏ qua isSuccess nên dù thanh toán thất bại (VD: cổng thanh toán lỗi,
+                // sai amount) đơn vẫn bị chuyển COMPLETED, khách coi như đã trả tiền dù chưa hề trả.
+                if (!paymentRes.isSuccess) {
+                    _errorFlow.emit(paymentRes.message ?: "Thanh toán thất bại — đơn chưa được hoàn tất")
+                    return@launch
+                }
 
                 // 2. Loop cập nhật TỪNG đơn của bàn sang COMPLETED (đúng vòng lặp
                 //    handleUpdateOrderStatus bên Web) — không dừng giữa chừng nếu 1 đơn lỗi, cố gắng

@@ -11,8 +11,13 @@ const TIER_FALLBACK = {
 };
 
 const CustomerOrderApp = () => {
-  const [tableId, setTableId] = useState('');
-  const [tableName, setTableName] = useState('');
+  // Đọc thẳng từ URL ngay lúc khởi tạo state (không đợi useEffect) — tránh 1 nhịp render "chưa có
+  // bàn" bị chớp qua trước khi effect bên dưới kịp set lại, dù link có tableId hợp lệ.
+  const [tableId, setTableId] = useState(() => new URLSearchParams(window.location.search).get('tableId') || '');
+  const [tableName, setTableName] = useState(() => new URLSearchParams(window.location.search).get('tableName') || '');
+  // Token do table-service cấp gắn với đúng bàn này (nhúng trong QR dưới dạng "tk", hoặc trả về kèm
+  // lúc "đặt bàn ngay") — order-service dùng để xác thực POST /orders/public thực sự đến từ đúng bàn.
+  const [tableToken, setTableToken] = useState(() => new URLSearchParams(window.location.search).get('tk') || '');
   
   const [categories, setCategories] = useState([]);
   const [foods, setFoods] = useState([]);
@@ -64,6 +69,20 @@ const CustomerOrderApp = () => {
   const [guestNameInput, setGuestNameInput] = useState('');
   const [guestPhoneInput, setGuestPhoneInput] = useState('');
 
+  // ===== ĐẶT BÀN TRƯỚC (chỉ dùng khi vào từ nút "Khách" mà không có tableId trên URL) =====
+  // resStep: 'intro' (2 lựa chọn) -> 'now' (chọn bàn trống ngay) | 'later' (đặt theo ngày/giờ thật) -> 'success' (chỉ cho 'later')
+  const [resStep, setResStep] = useState('intro');
+  const [resPartySize, setResPartySize] = useState('2');
+  const [resDate, setResDate] = useState('');
+  const [resTime, setResTime] = useState('');
+  const [resName, setResName] = useState('');
+  const [resPhone, setResPhone] = useState('');
+  const [resAvailable, setResAvailable] = useState(null); // null = chưa tìm, [] = tìm rồi nhưng hết bàn
+  const [resSelectedTableId, setResSelectedTableId] = useState('');
+  const [resLoading, setResLoading] = useState(false);
+  const [resError, setResError] = useState('');
+  const [resConfirmed, setResConfirmed] = useState(null);
+
   const [showAccountPanel, setShowAccountPanel] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
   const [pointsHistory, setPointsHistory] = useState([]);
@@ -75,9 +94,11 @@ const CustomerOrderApp = () => {
     const params = new URLSearchParams(window.location.search);
     const tid = params.get('tableId');
     const tname = params.get('tableName');
+    const ttoken = params.get('tk');
 
     if (tid) setTableId(tid);
     if (tname) setTableName(tname);
+    if (ttoken) setTableToken(ttoken);
 
     // Đến từ nút "Guest" ở màn chọn chung (App.jsx) -> mở thẳng modal ở tab Khách, không bắt phải
     // tự bấm nút "Đăng nhập" trên header trước.
@@ -163,6 +184,89 @@ const CustomerOrderApp = () => {
     localStorage.removeItem(GUEST_STORAGE_KEY);
     setGuestName('');
     setGuestPhone('');
+  };
+
+  // Định dạng "2026-08-22T19:30:00" theo GIỜ ĐỊA PHƯƠNG (không dùng toISOString() vì nó quy về UTC) —
+  // khớp với LocalDateTime mà backend table-service mong đợi (@DateTimeFormat ISO.DATE_TIME).
+  const toLocalIso = (d) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const getReservationTargetIso = () => (
+    resStep === 'now' ? toLocalIso(new Date()) : `${resDate}T${resTime}:00`
+  );
+
+  const handleResBack = () => {
+    setResStep('intro');
+    setResAvailable(null);
+    setResSelectedTableId('');
+    setResError('');
+  };
+
+  const handleFindAvailableTables = async () => {
+    setResError('');
+    const partySize = parseInt(resPartySize, 10);
+    if (!partySize || partySize <= 0) { setResError('Vui lòng nhập số lượng khách hợp lệ.'); return; }
+    if (!resName.trim() || !resPhone.trim()) { setResError('Vui lòng nhập đủ tên và số điện thoại.'); return; }
+    if (resStep === 'later' && (!resDate || !resTime)) { setResError('Vui lòng chọn ngày và giờ muốn đặt bàn.'); return; }
+
+    setResLoading(true);
+    try {
+      const reservedAtIso = getReservationTargetIso();
+      const res = await apiService.dashboard.getAvailableTablesForReservation(reservedAtIso, partySize);
+      setResAvailable(res.data || res || []);
+      setResSelectedTableId('');
+    } catch (err) {
+      setResError('Không tải được danh sách bàn trống: ' + err.message);
+    } finally {
+      setResLoading(false);
+    }
+  };
+
+  const handleConfirmReservation = async () => {
+    if (!resSelectedTableId) { setResError('Vui lòng chọn 1 bàn.'); return; }
+    setResError('');
+    setResLoading(true);
+    try {
+      const partySize = parseInt(resPartySize, 10);
+      const reservedAtIso = getReservationTargetIso();
+      const name = resName.trim();
+      const phone = resPhone.trim();
+      const payload = {
+        tableId: resSelectedTableId,
+        customerName: name,
+        customerPhone: phone,
+        partySize,
+        reservedAt: reservedAtIso,
+      };
+      const res = await apiService.dashboard.createReservation(payload);
+      const reservation = res.data || res;
+
+      if (resStep === 'now') {
+        // Đặt bàn trống NGAY -> vào thẳng thực đơn, không cần qua bước "Khách" riêng nữa.
+        const chosenTable = (resAvailable || []).find(t => t.id === resSelectedTableId);
+        setTableId(resSelectedTableId);
+        setTableName(chosenTable ? String(chosenTable.tableNumber) : String(reservation?.tableNumber || ''));
+        // table-service cấp kèm token cho đúng bàn này ngay trong response đặt bàn — dùng luôn, khỏi
+        // cần khách quét QR mới có được token (giống hệt cơ chế mã QR in sẵn).
+        if (reservation?.qrToken) setTableToken(reservation.qrToken);
+        setGuestName(name);
+        setGuestPhone(phone);
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+        localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify({ name, phone, expiresAt }));
+        setEntryResolved(true);
+      } else {
+        // Đặt trước theo ngày/giờ thật -> chỉ hiện màn xác nhận, KHÔNG cho vào thực đơn (khách chưa
+        // có mặt tại quán để order).
+        setResConfirmed(reservation);
+        setResStep('success');
+      }
+    } catch (err) {
+      setResError('Đặt bàn thất bại: ' + err.message);
+    } finally {
+      setResLoading(false);
+    }
   };
 
   // "Tiếp tục không cần tài khoản" ở màn cổng vào — cho xem/đặt món ẩn danh như trước giờ, chỉ nhớ
@@ -518,52 +622,81 @@ const CustomerOrderApp = () => {
         note: item.note
       }));
 
-      // Nếu bàn này đã có đơn đang mở (khách gọi thêm món trong cùng lượt ăn), cộng dồn vào đơn cũ
-      // thay vì tạo đơn mới — tránh 1 bàn bị tách thành nhiều đơn song song, dễ nhầm lẫn khi tính tiền.
-      // Cách làm: lưu orderId vừa tạo vào sessionStorage của máy khách; lần gọi thêm sau sẽ kiểm tra
-      // lại đơn đó còn đang mở không (PENDING/CONFIRMED/ORDERING) trước khi cộng vào. Nếu đơn đã
-      // COMPLETED/CANCELLED, hoặc không kiểm tra được (vd. cần đăng nhập), thì tự tạo đơn mới như cũ —
-      // không có gì bị hỏng thêm so với hành vi hiện tại.
-      const storageKey = tableId ? `activeOrderId_table_${tableId}` : null;
-      const cachedOrderId = storageKey ? sessionStorage.getItem(storageKey) : null;
-      let reuseOrderId = null;
+      // ✅ Trừ kho NGAY tại thời điểm món thực sự vào đơn (bấm "Đặt món" ở giỏ hàng), validate đủ
+      // số lượng khách yêu cầu — nếu kho không đủ (VD: gọi 5 suất nhưng kho chỉ còn 3) thì chặn
+      // luôn tại đây, không cho tạo/thêm vào đơn. Đồng bộ với luồng nhân viên (App.jsx/handleSubmitOrder).
+      const deductItems = items.map(it => ({ menuItemId: it.menuItemId, quantity: it.quantity }));
+      try {
+        await apiService.catalog.deductStock(deductItems);
+      } catch (e) {
+        alert('Không đủ nguyên liệu trong kho: ' + e.message);
+        setLoading(false);
+        return;
+      }
 
-      if (cachedOrderId) {
-        try {
-          const check = await apiService.order.getById(cachedOrderId);
-          const order = check?.data;
-          if (order && ['PENDING', 'CONFIRMED', 'ORDERING'].includes(order.status)) {
-            reuseOrderId = cachedOrderId;
+      // Từ đây kho đã bị trừ — nếu bước thêm món/tạo đơn bên dưới thất bại giữa chừng thì phải hoàn
+      // lại phần vừa trừ (finally), tránh lệch số liệu kho cho món chưa thực sự vào đơn nào.
+      let deductedPendingCompensation = true;
+      try {
+        // Nếu bàn này đã có đơn đang mở (khách gọi thêm món trong cùng lượt ăn), cộng dồn vào đơn cũ
+        // thay vì tạo đơn mới — tránh 1 bàn bị tách thành nhiều đơn song song, dễ nhầm lẫn khi tính tiền.
+        // Cách làm: lưu orderId vừa tạo vào sessionStorage của máy khách; lần gọi thêm sau sẽ kiểm tra
+        // lại đơn đó còn đang mở không (PENDING/CONFIRMED/ORDERING) trước khi cộng vào. Nếu đơn đã
+        // COMPLETED/CANCELLED, hoặc không kiểm tra được (vd. cần đăng nhập), thì tự tạo đơn mới như cũ —
+        // không có gì bị hỏng thêm so với hành vi hiện tại.
+        const storageKey = tableId ? `activeOrderId_table_${tableId}` : null;
+        const cachedOrderId = storageKey ? sessionStorage.getItem(storageKey) : null;
+        let reuseOrderId = null;
+
+        if (cachedOrderId) {
+          try {
+            // Dùng endpoint public (không JWT) — endpoint thường /orders/{id} yêu cầu đăng nhập nhân
+            // viên nên trước đây khách ẩn danh luôn bị 403 ở bước kiểm tra này, khiến "gọi thêm món"
+            // không bao giờ cộng dồn được vào đơn cũ mà cứ tạo đơn mới mỗi lần.
+            const check = await apiService.order.getPublicById(cachedOrderId, tableToken);
+            const order = check?.data;
+            if (order && ['PENDING', 'CONFIRMED', 'ORDERING'].includes(order.status)) {
+              reuseOrderId = cachedOrderId;
+            }
+          } catch (checkErr) {
+            reuseOrderId = null; // không kiểm tra được -> coi như không dùng lại, tạo đơn mới bên dưới
           }
-        } catch (checkErr) {
-          reuseOrderId = null; // không kiểm tra được -> coi như không dùng lại, tạo đơn mới bên dưới
+        }
+
+        if (reuseOrderId) {
+          for (const item of items) {
+            await apiService.order.addItemPublic(reuseOrderId, tableToken, item);
+          }
+        } else {
+          const payload = {
+            tableId,
+            tableToken,
+            // Đến đây tableId chắc chắn có giá trị (đã chặn ở gate "Không tìm thấy bàn" phía trên) —
+            // tableName chỉ có thể thiếu nếu link QR quên tham số tableName, vẫn còn tableId để hiển thị.
+            tableNumber: tableName || `Bàn ${tableId}`,
+            // Khách dùng "tài khoản khách" tạm thời (không có customerId, không tích điểm) thì đính kèm
+            // tên vào note để nhân viên/bếp biết đơn này của ai — customerId vẫn null như order ẩn danh.
+            note: guestName ? `Khách: ${guestName} - ${guestPhone}` : 'Order từ mã QR',
+            items,
+            // Gắn khách đã đăng nhập vào đơn để loyalty-service cộng điểm đúng người lúc thanh toán.
+            // null nếu khách không đăng nhập — order vẫn tạo được bình thường như trước giờ.
+            customerId: customer?.id || null,
+          };
+          const res = await apiService.order.createPublic(payload);
+          const newOrderId = res?.data?.id;
+          if (storageKey && newOrderId) sessionStorage.setItem(storageKey, newOrderId);
+        }
+
+        deductedPendingCompensation = false;
+
+        setOrderStatus('success');
+        setCart([]);
+        setShowCart(false);
+      } finally {
+        if (deductedPendingCompensation) {
+          try { await apiService.catalog.refundStock(deductItems); } catch (_) { /* best-effort */ }
         }
       }
-
-      if (reuseOrderId) {
-        for (const item of items) {
-          await apiService.order.addItem(reuseOrderId, item);
-        }
-      } else {
-        const payload = {
-          tableId: tableId || null,
-          tableNumber: tableName || 'Mang đi',
-          // Khách dùng "tài khoản khách" tạm thời (không có customerId, không tích điểm) thì đính kèm
-          // tên vào note để nhân viên/bếp biết đơn này của ai — customerId vẫn null như order ẩn danh.
-          note: guestName ? `Khách: ${guestName} - ${guestPhone}` : 'Order từ mã QR',
-          items,
-          // Gắn khách đã đăng nhập vào đơn để loyalty-service cộng điểm đúng người lúc thanh toán.
-          // null nếu khách không đăng nhập — order vẫn tạo được bình thường như trước giờ.
-          customerId: customer?.id || null,
-        };
-        const res = await apiService.order.createPublic(payload);
-        const newOrderId = res?.data?.id;
-        if (storageKey && newOrderId) sessionStorage.setItem(storageKey, newOrderId);
-      }
-
-      setOrderStatus('success');
-      setCart([]);
-      setShowCart(false);
     } catch (err) {
       console.error(err);
       alert('Đã xảy ra lỗi khi đặt món: ' + err.message);
@@ -571,6 +704,137 @@ const CustomerOrderApp = () => {
       setLoading(false);
     }
   };
+
+  // ✅ Quán KHÔNG có hình thức "Mang đi" — mọi đơn đều phải gắn với 1 bàn thật. Trước đây thiếu
+  // tableId/tableName trên URL thì âm thầm coi là đơn mang đi, khiến đơn của khách (đúng ra đang
+  // ngồi ở 1 bàn) bị ghi sai thành "Mang đi" nếu link không mang theo thông tin bàn. Giờ chặn hẳn
+  // tại đây — ưu tiên cao hơn cả màn cổng vào (!entryResolved) bên dưới, vì không có bàn thì dù
+  // đăng nhập/chọn Khách xong cũng không có gì để gắn đơn vào.
+  if (!tableId) {
+    // Vào từ nút "Khách" (App.jsx -> /customer?entry=guest) thay vì quét QR thật -> cho phép tự
+    // chọn bàn/đặt bàn trước thay vì chặn hẳn. Quét nhầm 1 link cụt không có tableId (không qua nút
+    // Khách) thì vẫn bị chặn như cũ, vì không có ngữ cảnh gì để biết khách có thật sự ở quán không.
+    const isGuestEntry = new URLSearchParams(window.location.search).get('entry') === 'guest';
+
+    const resInputStyle = { width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid #CBD5E1', outline: 'none', fontSize: '15px', boxSizing: 'border-box' };
+    const resPrimaryBtnStyle = { width: '100%', padding: '16px', backgroundColor: '#11117F', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' };
+    const resOutlineBtnStyle = { width: '100%', padding: '16px', backgroundColor: '#FFF', color: '#11117F', border: '2px solid #11117F', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' };
+
+    if (isGuestEntry && (resStep === 'now' || resStep === 'later')) {
+      return (
+        <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', fontFamily: '"Inter", sans-serif' }}>
+          <div style={{ width: '100%', maxWidth: '400px' }}>
+            <button onClick={handleResBack} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '14px', cursor: 'pointer', padding: 0, marginBottom: '16px' }}>← Quay lại</button>
+            <h1 style={{ margin: '0 0 6px', fontSize: '20px', fontWeight: '800', color: '#11117F' }}>
+              {resStep === 'now' ? '🍽️ Chọn bàn trống' : '📅 Đặt bàn trước'}
+            </h1>
+            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#64748B' }}>
+              {resStep === 'now'
+                ? 'Nhập thông tin để xem những bàn còn trống ngay bây giờ.'
+                : 'Chọn ngày giờ bạn muốn đến — bàn sẽ được giữ cho bạn, chưa cần có mặt tại quán.'}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <input type="text" placeholder="Tên của bạn" value={resName} onChange={e => setResName(e.target.value)} style={resInputStyle} />
+              <input type="tel" placeholder="Số điện thoại" value={resPhone} onChange={e => setResPhone(e.target.value)} style={resInputStyle} />
+              <input type="number" min="1" placeholder="Số lượng khách" value={resPartySize} onChange={e => setResPartySize(e.target.value)} style={resInputStyle} />
+              {resStep === 'later' && (
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input type="date" value={resDate} onChange={e => setResDate(e.target.value)} style={{ ...resInputStyle, flex: 1 }} />
+                  <input type="time" value={resTime} onChange={e => setResTime(e.target.value)} style={{ ...resInputStyle, flex: 1 }} />
+                </div>
+              )}
+            </div>
+
+            {resError && <p style={{ color: '#EF4444', fontSize: '13px', marginTop: '14px' }}>{resError}</p>}
+
+            <button onClick={handleFindAvailableTables} disabled={resLoading} style={{ ...resPrimaryBtnStyle, marginTop: '20px' }}>
+              {resLoading ? 'Đang tìm...' : 'Tìm bàn trống'}
+            </button>
+
+            {resAvailable !== null && (
+              resAvailable.length === 0 ? (
+                <p style={{ marginTop: '20px', fontSize: '14px', color: '#64748B', textAlign: 'center' }}>
+                  Hết bàn trống vào khung giờ này, vui lòng chọn giờ khác.
+                </p>
+              ) : (
+                <>
+                  <p style={{ margin: '24px 0 10px', fontSize: '13px', fontWeight: '700', color: '#11117F' }}>Chọn 1 bàn:</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    {resAvailable.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setResSelectedTableId(t.id)}
+                        style={{
+                          padding: '12px 16px', borderRadius: '12px', cursor: 'pointer', fontSize: '14px', fontWeight: '700',
+                          border: `2px solid ${resSelectedTableId === t.id ? '#11117F' : '#CBD5E1'}`,
+                          backgroundColor: resSelectedTableId === t.id ? '#11117F' : '#FFF',
+                          color: resSelectedTableId === t.id ? '#FFF' : '#11117F',
+                        }}
+                      >
+                        Bàn {t.tableNumber} · {t.capacity} khách
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={handleConfirmReservation} disabled={resLoading || !resSelectedTableId} style={{ ...resPrimaryBtnStyle, marginTop: '20px' }}>
+                    {resLoading ? 'Đang xử lý...' : (resStep === 'now' ? 'Xác nhận và vào thực đơn' : 'Xác nhận đặt bàn')}
+                  </button>
+                </>
+              )
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (isGuestEntry && resStep === 'success') {
+      return (
+        <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', fontFamily: '"Inter", sans-serif' }}>
+          <div style={{ fontSize: '56px', marginBottom: '20px' }}>✅</div>
+          <h1 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: '800', color: '#11117F' }}>Đã đặt bàn thành công!</h1>
+          <div style={{ backgroundColor: '#FFF', borderRadius: '16px', padding: '20px 24px', margin: '0 0 28px', textAlign: 'left', width: '100%', maxWidth: '340px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <p style={{ margin: '0 0 8px', fontSize: '15px' }}><strong>Bàn:</strong> {resConfirmed?.tableNumber ?? '—'}</p>
+            <p style={{ margin: '0 0 8px', fontSize: '15px' }}><strong>Thời gian:</strong> {resDate} lúc {resTime}</p>
+            <p style={{ margin: '0 0 8px', fontSize: '15px' }}><strong>Số khách:</strong> {resPartySize}</p>
+            <p style={{ margin: 0, fontSize: '15px' }}><strong>Tên:</strong> {resName}</p>
+          </div>
+          <p style={{ margin: '0 0 28px', fontSize: '14px', color: '#64748B', maxWidth: '340px', lineHeight: 1.6 }}>
+            Vui lòng quét mã QR tại bàn khi đến quán để bắt đầu gọi món.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', backgroundColor: '#11117F', color: '#FFF', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}
+          >
+            Xong
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', fontFamily: '"Inter", sans-serif' }}>
+        <div style={{ fontSize: '56px', marginBottom: '20px' }}>🔒</div>
+        <h1 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: '800', color: '#11117F' }}>Không tìm thấy bàn</h1>
+        <p style={{ margin: '0 0 28px', fontSize: '15px', color: '#64748B', maxWidth: '360px', lineHeight: 1.6 }}>
+          Nhà hàng không có hình thức mang đi — vui lòng quét mã QR gắn tại bàn bạn đang ngồi để bắt đầu đặt món. Link này không gắn với bàn nào cả.
+        </p>
+
+        {isGuestEntry && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '320px', marginBottom: '20px' }}>
+            <button onClick={() => { setResStep('now'); setResError(''); }} style={resPrimaryBtnStyle}>🍽️ Tôi đang ở nhà hàng, chọn bàn trống</button>
+            <button onClick={() => { setResStep('later'); setResError(''); }} style={resOutlineBtnStyle}>📅 Đặt bàn trước theo giờ</button>
+          </div>
+        )}
+
+        <button
+          onClick={() => window.location.reload()}
+          style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', backgroundColor: isGuestEntry ? 'transparent' : '#11117F', color: isGuestEntry ? '#64748B' : '#FFF', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}
+        >
+          {isGuestEntry ? 'Tôi có mã QR, thử lại' : 'Thử lại'}
+        </button>
+      </div>
+    );
+  }
 
   // Cổng vào toàn màn hình: chưa đăng nhập / chưa chọn Khách / chưa bấm "Tiếp tục không cần tài khoản"
   // thì dừng ở đây — không render thực đơn phía sau nữa, tránh tình trạng thấy mờ mờ món ăn qua modal.

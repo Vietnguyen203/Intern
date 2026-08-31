@@ -48,6 +48,21 @@ public class JwtUtil {
         }
     }
 
+    // Cấp token gắn với 1 chủ thể bất kỳ (staff username, hoặc "table:<tableId>" cho token QR của
+    // bàn) với hạn dùng tuỳ ý — table-service trước giờ chỉ xác thực token do users-service cấp,
+    // giờ cần tự cấp thêm token cho mã QR/đặt bàn nên bổ sung hàm này.
+    public String generateToken(String subject, String role, long expiryMillis) {
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("role", role);
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expiryMillis))
+                .signWith(getSignInKey(), io.jsonwebtoken.SignatureAlgorithm.HS256)
+                .compact();
+    }
+
     private boolean isTokenExpired(String token) {
         return extractClaim(token, Claims::getExpiration).before(new Date());
     }

@@ -13,8 +13,8 @@ public class PaymentEventListener {
 
     private final LoyaltyService loyaltyService;
 
-    // Tên topic CHƯA XÁC NHẬN với payment-service thật — sửa lại giá trị mặc định trong
-    // application.yml (loyalty.kafka.payment-topic) khi biết chính xác tên topic đang dùng.
+    // Topic đã khớp với payment-service thật (payment.kafka.completed-topic=payment-completed,
+    // xem PaymentService.publishPaymentCompletedEvent bên payment-service).
     @KafkaListener(
             topics = "${loyalty.kafka.payment-topic}",
             containerFactory = "paymentEventListenerContainerFactory"

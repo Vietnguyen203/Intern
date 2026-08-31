@@ -2,7 +2,10 @@
 // Kitchen Display System (KDS) — hàm thuần, không phụ thuộc React.
 // ---------------------------------------------------------
 // Giá trị mặc định — có thể chỉnh trong tab Settings (xem kdsSettings/KDS_SETTINGS_DEFAULT trong DashboardScreen).
-export const KDS_SETTINGS_DEFAULT = { warningMinutes: 10, criticalMinutes: 15, autoStartMinutes: 0, autoReadyMinutes: 0, autoPrintOnCooking: false };
+// autoPrintOnCooking mặc định BẬT — in phiếu là việc bếp cần thấy ngay khi món "vào bếp"
+// (COOKING), qua bất kỳ đường nào: xác nhận đặt món, bếp bấm tay, hay tự động theo giờ.
+// Người dùng vẫn tắt được trong Settings nếu không muốn tự tải ảnh phiếu mô phỏng.
+export const KDS_SETTINGS_DEFAULT = { warningMinutes: 10, criticalMinutes: 15, autoStartMinutes: 0, autoReadyMinutes: 0, autoPrintOnCooking: true };
 
 const wrapCanvasTextLines = (ctx, text, maxWidth) => {
   const words = String(text).split(' ');

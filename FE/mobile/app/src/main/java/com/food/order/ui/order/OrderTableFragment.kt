@@ -15,6 +15,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.food.order.R
 import com.food.order.adapter.OrderFoodAdapter
+import com.food.order.data.SessionManager
 import com.food.order.data.model.OrderItem
 import com.food.order.databinding.FragmentOrderTableBinding
 import kotlinx.coroutines.flow.collectLatest
@@ -30,11 +31,7 @@ class OrderTableFragment : Fragment() {
     // Chỉ tự động navigate sang màn gọi món 1 lần duy nhất khi mở bàn
     private var autoNavigated = false
 
-    private val userToken: String by lazy {
-        ("Bearer " + requireContext()
-            .getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            .getString("token", ""))
-    }
+    private val userToken: String by lazy { SessionManager.getBearerToken(requireContext()) }
 
     private val adapter: OrderFoodAdapter by lazy {
         OrderFoodAdapter(Collections.emptyList()) { item ->

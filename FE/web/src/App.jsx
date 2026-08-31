@@ -11,7 +11,7 @@ import {
   LineChart, Line, PieChart, Cell, Pie
 } from 'recharts';
 import jsPDF from 'jspdf';
-import { apiService } from './services/api';
+import { apiService, WS_BASE_URL } from './services/api';
 import './index.css';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
@@ -24,6 +24,7 @@ import { useConfirm } from './shared/hooks/useConfirm';
 import { ToastContainer } from './shared/components/ToastContainer';
 import { WelcomeSplash } from './shared/components/WelcomeSplash';
 import { QRCodeModal } from './shared/components/QRCodeModal';
+import { ReservationsPanel } from './shared/components/ReservationsPanel';
 import { LoginScreen } from './features/auth/LoginScreen';
 import { KDS_SETTINGS_DEFAULT, printKitchenTicket } from './features/dashboard/kitchen/kitchenUtils';
 import { useKitchen } from './features/dashboard/kitchen/useKitchen';
@@ -328,6 +329,7 @@ const DashboardScreen = ({ user, onLogout }) => {
   const [orderNote, setOrderNote] = useState('');
   const [selectedTableForOrders, setSelectedTableForOrders] = useState(null);
   const [selectedTableForQR, setSelectedTableForQR] = useState(null);
+  const [showReservationsPanel, setShowReservationsPanel] = useState(false);
 
   // Order Options Popup States
   const [selectedFoodForOrder, setSelectedFoodForOrder] = useState(null);
@@ -442,11 +444,11 @@ const DashboardScreen = ({ user, onLogout }) => {
   // WebSocket Connection for Real-time Tables
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const socket = new SockJS('http://localhost:8080/ws-tables');
     const stompClient = new Client({
-      webSocketFactory: () => socket,
+      webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws-tables`),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: (str) => console.log('>>> [WS Debug Table]:', str),
+      reconnectDelay: 5000, // Tự động kết nối lại sau 5s nếu bị rớt (mất mạng, backend restart...)
       onConnect: () => {
         console.log('>>> WebSocket Connected to table-service');
         stompClient.subscribe('/topic/tables', (message) => {
@@ -465,11 +467,11 @@ const DashboardScreen = ({ user, onLogout }) => {
   // WebSocket Connection for General Notifications
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const socket = new SockJS('http://localhost:8080/ws-notifications');
     const stompClient = new Client({
-      webSocketFactory: () => socket,
+      webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws-notifications`),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: (str) => console.log('>>> [WS Debug Note]:', str),
+      reconnectDelay: 5000, // Tự động kết nối lại sau 5s nếu bị rớt (mất mạng, backend restart...)
       onConnect: () => {
         console.log('>>> WebSocket Connected to notification-service');
         stompClient.subscribe('/topic/public', (message) => {
@@ -612,6 +614,7 @@ const DashboardScreen = ({ user, onLogout }) => {
     kitchenCategoryFilter, setKitchenCategoryFilter,
     loading: kitchenLoading, timeTicker, kdsCookStartRef,
     fetchKitchenData, handleUpdateItemStatus, handleCompleteAllItems,
+    handleCancelOrderFromKitchen,
   } = useKitchen({ toast, tables, foods, categories, kdsSettings });
 
   // Chế độ Kiosk giờ mở ở 1 tab/cửa sổ riêng (KitchenKioskPage) chạy dữ liệu thật, thay vì
@@ -801,13 +804,21 @@ const DashboardScreen = ({ user, onLogout }) => {
     } catch (e) { toast.error('Lỗi xác nhận đơn: ' + e.message); }
   };
 
-  const handleUpdateOrderStatus = async (orderId, status) => {
+  // opts.silent=true: dùng khi caller (vd. checkout) tự orchestrate nhiều lệnh cập nhật và cần biết
+  // chính xác lệnh nào thất bại để compensate — nên ở chế độ này lỗi được ném lại thay vì chỉ hiện toast.
+  const handleUpdateOrderStatus = async (orderId, status, opts = {}) => {
+    const { silent = false } = opts;
     try {
       await apiService.order.updateStatus(orderId, status);
-      const labels = { CONFIRMED: 'Đã xác nhận', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy' };
-      toast.success(`Đơn hàng → ${labels[status] || status}`);
+      if (!silent) {
+        const labels = { CONFIRMED: 'Đã xác nhận', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy' };
+        toast.success(`Đơn hàng → ${labels[status] || status}`);
+      }
       fetchOrdersData();
-    } catch (e) { toast.error('Lỗi cập nhật đơn: ' + e.message); }
+    } catch (e) {
+      if (silent) throw e;
+      toast.error('Lỗi cập nhật đơn: ' + e.message);
+    }
   };
 
   // ---- Logic Gọi Món (Create Order) ----
@@ -987,8 +998,18 @@ const DashboardScreen = ({ user, onLogout }) => {
       }
     }
 
+    // Nhớ trạng thái gốc (PENDING/CONFIRMED) của từng đơn trong bàn, để có thể hoàn tác đúng nếu một
+    // đơn cập nhật COMPLETED thất bại giữa chừng — thay vì đoán bừa một trạng thái cố định.
+    const originalStatusByOrderId = {};
+    checkoutOrder.orderIds.forEach(oid => {
+      const o = allOrders.find(x => x.id === oid);
+      originalStatusByOrderId[oid] = o ? o.status : 'PENDING';
+    });
+
     try {
-      // 1. Lưu lịch sử thanh toán vào payment-service (Tổng số tiền của tất cả đơn)
+      // 1. Lưu lịch sử thanh toán vào payment-service (status = PENDING cho tới khi mọi đơn của bàn
+      // thanh toán xong xuôi ở bước 3). Nếu request này gọi lại do mất kết nối, backend trả về bản ghi
+      // PENDING cũ thay vì báo lỗi trùng (idempotent), nên bấm lại "Xác nhận thanh toán" vẫn an toàn.
       await apiService.payment.create({
         orderId: checkoutOrder.id,
         amount: checkoutOrder.totalAmount,
@@ -996,15 +1017,38 @@ const DashboardScreen = ({ user, onLogout }) => {
         note: paymentMethod === 'CASH' ? `Khách đưa: ${Number(customerCash) * 1000}đ (Thanh toán gộp bàn ${checkoutOrder.tableNumber})` : 'Thanh toán chuyển khoản VietQR'
       });
 
-      // 2. Cập nhật tất cả các đơn hàng của bàn này sang COMPLETED
-      for (const orderId of checkoutOrder.orderIds) {
-        await handleUpdateOrderStatus(orderId, 'COMPLETED');
+      // 2. Cập nhật tất cả các đơn hàng của bàn này sang COMPLETED. Nếu một đơn lỗi giữa chừng, hoàn
+      // tác (compensate) các đơn đã COMPLETED trước đó về đúng trạng thái gốc và đánh dấu payment FAILED
+      // — tránh để lại trạng thái nửa vời (một phần bàn đã tính tiền, phần còn lại thì chưa).
+      // Đây là compensation ở tầng orchestrator (client), không phải distributed transaction/Saga thật
+      // giữa các service — cần nêu rõ giới hạn này khi trình bày trong khóa luận.
+      const succeededOrderIds = [];
+      try {
+        for (const orderId of checkoutOrder.orderIds) {
+          await handleUpdateOrderStatus(orderId, 'COMPLETED', { silent: true });
+          succeededOrderIds.push(orderId);
+        }
+      } catch (orderErr) {
+        for (const oid of succeededOrderIds) {
+          try {
+            await apiService.order.updateStatus(oid, originalStatusByOrderId[oid]);
+          } catch (revertErr) {
+            console.error('Không thể hoàn tác đơn về trạng thái gốc:', oid, revertErr);
+          }
+        }
+        try { await apiService.payment.fail(checkoutOrder.id); } catch (failErr) { console.error('Không thể đánh dấu payment FAILED:', failErr); }
+        throw orderErr;
       }
+
+      // 3. Chỉ đánh dấu Payment = COMPLETED sau khi TOÀN BỘ đơn của bàn đã COMPLETED thành công —
+      // trước đây bước này bị thiếu hoàn toàn nên Payment luôn kẹt ở PENDING dù đã thu tiền xong.
+      await apiService.payment.complete(checkoutOrder.id);
 
       toast.success(`🎉 Thanh toán thành công cho bàn ${checkoutOrder.tableNumber}!`);
       setIsCheckoutModalOpen(false);
       setCheckoutOrder(null);
       setCustomerCash('');
+      fetchOrdersData();
       fetchOverviewData(); // Refresh overview numbers
     } catch (error) {
       toast.error('❌ Lỗi thanh toán: ' + error.message);
@@ -2009,6 +2053,13 @@ const DashboardScreen = ({ user, onLogout }) => {
                 <div className="card" style={{ padding: '24px', gridColumn: '2 / 3', gridRow: '1 / 2' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Table Status</h3>
+                    <button
+                      onClick={() => setShowReservationsPanel(true)}
+                      className="btn btn-outline"
+                      style={{ padding: '6px 14px', fontSize: '13px' }}
+                    >
+                      📅 Đặt bàn
+                    </button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     {loadingConfig.overview ? (
@@ -2076,6 +2127,7 @@ const DashboardScreen = ({ user, onLogout }) => {
             cookStartMap={kdsCookStartRef.current}
             onStatusChange={handleUpdateItemStatus}
             onCompleteAll={handleCompleteAllItems}
+            onCancelOrder={handleCancelOrderFromKitchen}
             onRefresh={fetchKitchenData}
             onEnterKiosk={openKitchenKiosk}
             canProposeFood={user?.role === 'KITCHEN'}
@@ -4425,6 +4477,7 @@ const DashboardScreen = ({ user, onLogout }) => {
 
       {/* QR Code Modal for Tables (Global) */}
       <QRCodeModal table={selectedTableForQR} onClose={() => setSelectedTableForQR(null)} />
+      <ReservationsPanel open={showReservationsPanel} onClose={() => setShowReservationsPanel(false)} />
 
 
       {/* Ingredient Modal overlay */}

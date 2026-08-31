@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
-@FeignClient(name = "notification-service", url = "http://localhost:8086/notifications")
+@FeignClient(name = "notification-service", url = "${notification.service.url}/notifications")
 public interface NotificationFeignClient {
 
     @PostMapping("/send")

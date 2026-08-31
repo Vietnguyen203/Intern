@@ -230,7 +230,9 @@ class CreateFoodFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // ===== Role guard: chỉ ADMIN =====
-        val role = (AppConstants.userModel?.role ?: "UNKNOWN").uppercase()
+        // ⚠️ AppConstants.userModel là `lateinit var` — phải checkExistsUser() trước khi đọc.
+        val rawRole: String? = if (AppConstants.checkExistsUser()) AppConstants.userModel.role else null
+        val role = (rawRole ?: "UNKNOWN").uppercase()
         if (role != "ADMIN") {
             Toast.makeText(requireContext(), getString(R.string.admin_only), Toast.LENGTH_SHORT).show()
             findNavController().navigateUp()

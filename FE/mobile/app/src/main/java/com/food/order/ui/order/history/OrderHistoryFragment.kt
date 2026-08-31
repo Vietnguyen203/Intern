@@ -1,6 +1,5 @@
 package com.food.order.ui.order.history
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,6 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.food.order.data.SessionManager
 import com.food.order.databinding.FragmentOrderHistoryBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -68,9 +68,7 @@ class OrderHistoryFragment : Fragment() {
         }
     }
 
-    private fun userToken(): String =
-        requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            .getString("token", "") ?: ""
+    private fun userToken(): String = SessionManager.getBearerToken(requireContext())
 
     override fun onDestroyView() {
         super.onDestroyView()

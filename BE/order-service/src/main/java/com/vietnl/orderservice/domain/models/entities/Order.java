@@ -30,6 +30,11 @@ public class Order {
     @Column(name = "table_number")
     private String tableNumber;
 
+    // Khách hàng loyalty-service đã đăng nhập lúc đặt món qua QR (nullable — đơn của khách vãng lai
+    // hoặc do nhân viên tạo thì để trống). Dùng để payment-service biết cộng điểm cho ai lúc thanh toán.
+    @Column(name = "customer_id")
+    private UUID customerId;
+
     // Nhân viên tạo đơn
     @Column(name = "created_by")
     private String createdBy;

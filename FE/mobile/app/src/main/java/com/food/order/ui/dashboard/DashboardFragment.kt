@@ -61,11 +61,15 @@ class DashboardFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        AppConstants.userModel?.let { u ->
+        // ⚠️ AppConstants.userModel là `lateinit var` — toán tử `?.` KHÔNG bảo vệ được lateinit
+        // (truy cập trước khi gán vẫn ném UninitializedPropertyAccessException), phải check
+        // checkExistsUser() trước, giống pattern ProfileFragment đang dùng.
+        if (AppConstants.checkExistsUser()) {
+            val u = AppConstants.userModel
             binding.tvEmployeeId.text = u.employeeId
             binding.tvName.text       = u.displayName
             binding.tvBirthday.text   = DateUtils.formatBirthday(u.birthday)
-        } ?: run {
+        } else {
             binding.tvEmployeeId.text = ""
             binding.tvName.text       = ""
         }
@@ -103,6 +107,7 @@ class DashboardFragment : Fragment() {
                         "KITCHEN"          -> safeNavigate(R.id.navigation_kitchen)
                         "INVENTORY"        -> safeNavigate(R.id.navigation_inventory)
                         "PROFILE"          -> safeNavigate(R.id.navigation_profile)
+                        "RESERVATIONS"     -> safeNavigate(R.id.navigation_reservations)
                         "LOGOUT"           -> safeNavigate(R.id.navigation_logout_dialog)
                     }
                 }.show(fm, tag)

@@ -43,9 +43,11 @@ class MainActivity : AppCompatActivity() {
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        // ⚠️ CHANGED: KHÔNG gọi registerFcmToken() ở đây nữa — tại thời điểm này (onCreate, cold
+        // launch) token đăng nhập vừa bị xoá bên dưới nên chưa có gì để gửi lên backend. Việc đăng
+        // ký FCM token thật sự diễn ra ngay sau khi đăng nhập thành công, xem LoginFragment.
         if (granted) {
             android.util.Log.d("MainActivity", "POST_NOTIFICATIONS granted")
-            fetchAndRegisterFcmToken()
         } else {
             android.util.Log.w("MainActivity", "POST_NOTIFICATIONS denied by user")
         }
@@ -63,10 +65,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         // Clear token on fresh launch to enforce re-login after closing app
+        // ⚠️ CHANGED: token giờ lưu trong EncryptedSharedPreferences (xem SessionManager), không còn
+        // ở "app_prefs" plain nữa — dùng SessionManager.clearToken() thay vì xoá thẳng key "token"
+        // khỏi getSharedPreferences("app_prefs", ...) (thao tác đó giờ không xoá được gì cả).
         if (savedInstanceState == null) {
-            getSharedPreferences("app_prefs", MODE_PRIVATE).edit {
-                remove("token")
-            }
+            SessionManager.clearToken(this)
         }
 
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -79,29 +82,35 @@ class MainActivity : AppCompatActivity() {
         }
 
         maybeAskServerOnce()
-        requestNotificationPermissionAndRegisterToken()
+        // ⚠️ CHANGED: onCreate() chỉ còn xin quyền POST_NOTIFICATIONS (khởi tạo SDK-level, không
+        // phụ thuộc phiên đăng nhập). KHÔNG gọi đăng ký FCM token lên backend ở đây nữa — trước đây
+        // gọi ngay sau khi vừa xoá token (dòng "Clear token on fresh launch" ở trên) nên request
+        // luôn no-op (SessionManager.getToken() null); và vì không có nơi nào gọi lại sau khi đăng
+        // nhập thành công, thiết bị coi như không bao giờ nhận được push notification cho tới lần
+        // cold-launch kế tiếp. Đăng ký token thật sự diễn ra ngay sau login, xem LoginFragment
+        // (gọi MainActivity.registerFcmToken()).
+        requestNotificationPermission()
     }
 
     /**
-     * Xin quyền POST_NOTIFICATIONS (chỉ cần Android 13+).
-     * Sau khi có quyền, lấy FCM token và gửi lên backend.
+     * Xin quyền POST_NOTIFICATIONS (chỉ cần Android 13+, các bản trước tự động có quyền).
      */
-    private fun requestNotificationPermissionAndRegisterToken() {
+    private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            when (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
-                PackageManager.PERMISSION_GRANTED -> fetchAndRegisterFcmToken()
-                else -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-        } else {
-            // Android 12 trở xuống: tự động có quyền
-            fetchAndRegisterFcmToken()
         }
     }
 
     /**
-     * Lấy FCM token từ Firebase và gửi lên backend nếu đã đăng nhập.
+     * Lấy FCM token từ Firebase và gửi lên backend — CHỈ nên gọi SAU KHI đăng nhập thành công (xem
+     * LoginFragment), vì cần authToken hợp lệ trong SessionManager để gắn Authorization header.
+     * No-op an toàn (return sớm) nếu chưa đăng nhập.
      */
-    private fun fetchAndRegisterFcmToken() {
+    fun registerFcmToken() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 android.util.Log.w("MainActivity", "FCM token fetch failed", task.exception)

@@ -47,7 +47,7 @@
         </createTable>
         <addForeignKeyConstraint baseTableName="recipes" baseColumnNames="menu_item_id"
                                  constraintName="fk_recipes_menu_item"
-                                 referencedTableName="menu-items" referencedColumnNames="id"/>
+                                 referencedTableName="menu_items" referencedColumnNames="id"/>
         <addForeignKeyConstraint baseTableName="recipes" baseColumnNames="ingredient_id"
                                  constraintName="fk_recipes_ingredient"
                                  referencedTableName="ingredients" referencedColumnNames="id"/>

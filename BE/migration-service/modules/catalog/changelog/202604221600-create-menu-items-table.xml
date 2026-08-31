@@ -6,7 +6,7 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
     <changeSet id="202604221600-create-menu-items-table" author="Vietnguyen203" labels="202604221600">
-        <createTable tableName="menu-items">
+        <createTable tableName="menu_items">
             <column name="id" type="UUID">
                 <constraints primaryKey="true"/>
             </column>
@@ -20,7 +20,7 @@
             <column name="updated_at" type="TIMESTAMP"/>
         </createTable>
         <rollback>
-            <dropTable tableName="menu-items"/>
+            <dropTable tableName="menu_items"/>
         </rollback>
     </changeSet>
 

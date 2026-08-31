@@ -5,6 +5,7 @@ import com.vietnl.tableservice.application.responses.ApiResponse;
 import com.vietnl.tableservice.application.usecases.TableService;
 import com.vietnl.tableservice.domain.entities.RestaurantTable;
 import com.vietnl.tableservice.domain.enums.TableStatus;
+import com.vietnl.tableservice.infrastructure.security.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,20 @@ import java.util.UUID;
 public class TableAPI {
 
     private final TableService tableService;
+    private final JwtUtil jwtUtil;
+
+    // QR in ra giấy dán tại bàn, không tiện đổi thường xuyên -> hạn dùng dài (1 năm).
+    private static final long TABLE_QR_TOKEN_TTL_MS = 365L * 24 * 60 * 60 * 1000;
+
+    // Nhân viên (đã đăng nhập) lấy token gắn với đúng bàn này để nhúng vào mã QR — order-service
+    // dùng token này xác thực POST /orders/public thực sự đến từ bàn nào, thay vì chỉ tin tableId
+    // trần trong body request (có thể bị sửa để đặt món "hộ" bàn khác).
+    @GetMapping("/{id}/qr-token")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getQrToken(@PathVariable UUID id) {
+        tableService.getById(id); // ném lỗi nếu bàn không tồn tại
+        String token = jwtUtil.generateToken("table:" + id, "TABLE_QR", TABLE_QR_TOKEN_TTL_MS);
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("token", token)));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<RestaurantTable>>> getAll(@RequestParam(required = false) TableStatus status) {

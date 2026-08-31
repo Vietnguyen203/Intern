@@ -152,10 +152,13 @@
                 app:iconSrc="@drawable/ic_profile"
                 app:titleText="Hồ sơ cá nhân" />
 
-            <View
+            <com.food.order.utils.widget.SystemMenuView
+                android:id="@+id/menuViewReservations"
                 android:layout_width="0dp"
                 android:layout_height="140dp"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                app:iconSrc="@drawable/icon_tables"
+                app:titleText="Đặt bàn trước" />
         </androidx.appcompat.widget.LinearLayoutCompat>
 
     </androidx.appcompat.widget.LinearLayoutCompat>

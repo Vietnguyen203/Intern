@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
+import com.food.order.data.KitchenRefreshBus
 import com.food.order.data.RetrofitClient
 import com.food.order.data.SessionManager
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -46,6 +47,13 @@ class FoodFirebaseMessagingService : FirebaseMessagingService() {
             ?: ""
 
         showLocalNotification(title, body)
+
+        // Mirror Web (App.jsx, kênh /ws-notifications): tiêu đề liên quan đơn hàng/thanh toán thì
+        // báo cho màn Bếp tự refetch, để món mới hiện ra ngay cả khi Bếp đang mở app (không chỉ dựa
+        // vào pollingJob 30s). Xem KitchenRefreshBus để biết lý do chỉ phát tín hiệu, không kèm data.
+        if (title.contains("Đơn hàng") || title.contains("Thanh toán")) {
+            KitchenRefreshBus.notifyOrderChanged()
+        }
     }
 
     private fun showLocalNotification(title: String, body: String) {

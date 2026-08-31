@@ -87,6 +87,18 @@
     </fragment>
 
     <fragment
+        android:id="@+id/navigation_reservations"
+        android:name="com.food.order.ui.reservation.ReservationFragment"
+        android:label="Reservations"
+        tools:layout="@layout/fragment_reservation" />
+
+    <fragment
+        android:id="@+id/navigation_create_reservation"
+        android:name="com.food.order.ui.reservation.CreateReservationFragment"
+        android:label="Create Reservation"
+        tools:layout="@layout/fragment_create_reservation" />
+
+    <fragment
         android:id="@+id/navigation_create_table"
         android:name="com.food.order.ui.table.CreateTableFragment"
         android:label="CreateTable"

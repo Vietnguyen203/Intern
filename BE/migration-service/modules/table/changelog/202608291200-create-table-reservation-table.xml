@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Đặt bàn trước (TableReservation) — bảng này trước đó chỉ được tạo qua Hibernate
+         ddl-auto=update, chưa từng có trong Liquibase. Thêm changeset này để migration-service
+         phản ánh đúng schema thật đang chạy, phòng khi table-service chuyển sang ddl-auto=validate. -->
+    <changeSet id="202608291200-create-table-reservation-table" author="Claude">
+        <createTable tableName="TABLE_RESERVATION">
+            <column name="ID" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="TABLE_ID" type="UUID"/>
+            <column name="TABLE_NUMBER" type="INTEGER"/>
+            <column name="CUSTOMER_NAME" type="VARCHAR(255)"/>
+            <column name="CUSTOMER_PHONE" type="VARCHAR(255)"/>
+            <column name="PARTY_SIZE" type="INTEGER"/>
+            <column name="RESERVED_AT" type="TIMESTAMP"/>
+            <column name="DURATION_MINUTES" type="INTEGER" defaultValueNumeric="90"/>
+            <column name="STATUS" type="SMALLINT"/>
+            <column name="CREATED_AT" type="TIMESTAMP"/>
+            <column name="UPDATED_AT" type="TIMESTAMP"/>
+        </createTable>
+        <rollback>
+            <dropTable tableName="TABLE_RESERVATION"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

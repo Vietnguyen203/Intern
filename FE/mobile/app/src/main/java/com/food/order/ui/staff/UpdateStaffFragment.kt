@@ -11,6 +11,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.food.order.R
+import com.food.order.data.SessionManager
 import com.food.order.data.request.UpdateStaffRequest
 import com.food.order.databinding.FragmentUpdateStaffBinding
 import com.food.order.utils.DateUtils
@@ -150,7 +151,7 @@ class UpdateStaffFragment : Fragment() {
             )
 
             viewModel.updateStaff(
-                sharedPref.getString("token", "") ?: "",
+                SessionManager.getToken(requireContext()) ?: "",
                 sharedPref.getString("server_address", "") ?: "",
                 employeeId,
                 request
@@ -160,7 +161,7 @@ class UpdateStaffFragment : Fragment() {
         binding.btnRemove.setOnClickListener {
             val employeeId = binding.edtEmployeeId.text.toString().trim()
             viewModel.deleteStaff(
-                sharedPref.getString("token", "") ?: "",
+                SessionManager.getToken(requireContext()) ?: "",
                 sharedPref.getString("server_address", "") ?: "",
                 employeeId
             )

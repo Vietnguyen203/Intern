@@ -11,6 +11,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.food.order.R
+import com.food.order.data.SessionManager
 import com.food.order.data.request.RegisterRequest
 // Nếu bạn cần dùng createdBy từ user đang đăng nhập thì mở comment dưới
 // import com.food.order.data.AppConstants
@@ -103,7 +104,7 @@ class CreateStaffFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            val token  = sharedPref.getString("token", "") ?: ""
+            val token  = SessionManager.getToken(requireContext()) ?: ""
             val server = sharedPref.getString("server_address", "") ?: ""
 
             val request = RegisterRequest(

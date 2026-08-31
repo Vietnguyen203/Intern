@@ -110,6 +110,26 @@ export const useKitchen = ({ toast, tables, foods, categories, kdsSettings }) =>
     } catch (error) { toast.error('Lỗi cập nhật: ' + error.message); }
   };
 
+  // ✅ Huỷ hẳn 1 đơn ngay từ tab Bếp — cần cho trường hợp đơn "mồ côi" (không gắn tableId hợp lệ,
+  // VD đơn "Mang đi" cũ trước khi có chặn ở CustomerOrderApp.jsx): loại đơn này KHÔNG bao giờ hiện
+  // ở panel theo bàn của tab Orders (lọc theo tableId khớp bàn thật), nên nếu chỉ có nút huỷ ở đó
+  // thì đơn bị kẹt vĩnh viễn, không ai huỷ được. Đặt thêm ở đây để tab Bếp luôn có đường thoát cho
+  // MỌI đơn nó thấy, kể cả đơn không thuộc bàn nào. Mirror handleCancelOrder bên App.jsx (Orders
+  // tab): huỷ đơn + hoàn kho toàn bộ nguyên liệu đã trừ cho các món của đơn đó.
+  const handleCancelOrderFromKitchen = async (orderId) => {
+    try {
+      await apiService.order.cancel(orderId);
+      const refundItems = kitchenItems
+        .filter(i => i.orderId === orderId && i.menuItemId && i.quantity > 0)
+        .map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity }));
+      if (refundItems.length > 0) {
+        try { await apiService.catalog.refundStock(refundItems); } catch (_) { /* best-effort */ }
+      }
+      toast.success('Đã huỷ đơn hàng');
+      fetchKitchenData();
+    } catch (error) { toast.error('Lỗi huỷ đơn: ' + error.message); }
+  };
+
   const handleCompleteAllItems = async (items) => {
     try {
       const pendingAndCooking = items.filter(i => i.kitchenStatus === 'PENDING' || i.kitchenStatus === 'COOKING');
@@ -183,5 +203,6 @@ export const useKitchen = ({ toast, tables, foods, categories, kdsSettings }) =>
     kitchenCategoryFilter, setKitchenCategoryFilter,
     loading, timeTicker, kdsCookStartRef,
     fetchKitchenData, handleUpdateItemStatus, handleCompleteAllItems,
+    handleCancelOrderFromKitchen,
   };
 };

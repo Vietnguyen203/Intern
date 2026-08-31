@@ -9,7 +9,15 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "point_transactions")
+@Table(
+        name = "point_transactions",
+        // Ràng buộc UNIQUE (order_id, type) ở tầng DB — lớp bảo vệ cuối cùng chống cộng điểm trùng
+        // khi Kafka redeliver/rebalance cùng 1 orderId (check existsByOrderIdAndType() ở service chỉ
+        // là optimistic, có thể race). type=EARN là loại duy nhất gán orderId thực sự (REDEEM/ADJUST/EXPIRE
+        // để orderId=null), nên 1 order chỉ tạo ra tối đa 1 dòng EARN. Nhiều dòng cùng orderId=NULL
+        // (REDEEM/ADJUST/EXPIRE) vẫn hợp lệ vì NULL không tham gia so sánh UNIQUE.
+        uniqueConstraints = @UniqueConstraint(name = "uk_point_tx_order_type", columnNames = {"order_id", "type"})
+)
 @Getter
 @Setter
 @NoArgsConstructor
