@@ -194,7 +194,7 @@ public class OrderService {
         if (request.getItems() != null) {
             List<Map<String, Object>> itemsToDeduct = new java.util.ArrayList<>();
             for (OrderItemRequest itemReq : request.getItems()) {
-                if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0
+                if (itemReq.getQuantity() <= 0
                         || itemReq.getQuantity() > PUBLIC_ORDER_MAX_QTY_PER_ITEM) {
                     throw new RuntimeException(
                             "Số lượng món không hợp lệ (tối đa " + PUBLIC_ORDER_MAX_QTY_PER_ITEM + " mỗi món/lần đặt qua QR).");
@@ -308,7 +308,7 @@ public class OrderService {
         }
         validateTableToken(order.getTableId(), tableToken);
         checkPublicOrderRateLimit(order.getTableId());
-        if (request.getQuantity() == null || request.getQuantity() <= 0
+        if (request.getQuantity() <= 0
                 || request.getQuantity() > PUBLIC_ORDER_MAX_QTY_PER_ITEM) {
             throw new RuntimeException(
                     "Số lượng món không hợp lệ (tối đa " + PUBLIC_ORDER_MAX_QTY_PER_ITEM + " mỗi món/lần đặt qua QR).");

@@ -27,7 +27,7 @@ services:
       APP_USER: Food_Order
       APP_USER_PASSWORD: ${DB_PASSWORD:-Ab@123456}
     ports:
-      - "1522:1521"
+      - "1525:1521"
     volumes:
       - oracle-data:/opt/oracle/oradata
     healthcheck:
